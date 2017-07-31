@@ -51,38 +51,3 @@ static void wifi_init()
     ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
-
-static void bs_main_task(void *pvParameters)
-{
-
-}
-
-static void bt_init()
-{
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    
-    if (esp_bt_controller_init(&bt_cfg) != ESP_OK) {
-        ESP_LOGI(TAG, "Bluetooth controller initialize failed");
-        return;
-    }
-
-    if (esp_bt_controller_enable(ESP_BT_MODE_BTDM) != ESP_OK) {
-        ESP_LOGI(TAG, "Bluetooth controller enable failed");
-        return;
-    }
-}
-
-void app_main()
-{
-    printf("BLACK STONE!!!\n");
-
-    /* Initialise wifi */
-    wifi_init();
-
-    /* Initialise bluetooth */
-    //bt_init();
-
-    /* Start main task */
-    //xTaskCreate(&bs_main_task, "bs_main_task", 4096, NULL, 5, NULL);
-
-}
