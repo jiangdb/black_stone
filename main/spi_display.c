@@ -58,7 +58,7 @@
 #define NUMBER_8                0x7F
 #define NUMBER_9                0x6F
 
-DRAM_ATTR static const uint8_t display_data[]={
+DRAM_ATTR static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
     NUMBER_8,
     NUMBER_8,
@@ -78,8 +78,57 @@ DRAM_ATTR static const uint8_t display_data[]={
     NUMBER_8,
 };
 
+static uint8_t numbers[] = {
+    NUMBER_0,
+    NUMBER_1,
+    NUMBER_2,
+    NUMBER_3,
+    NUMBER_4,
+    NUMBER_5,
+    NUMBER_6,
+    NUMBER_7,
+    NUMBER_8,
+};
+
+static spi_device_handle_t spi;
+
+void setTime(uint32_t timeInSeconds)
+{
+
+}
+
+void setDisplayInteger(uint8_t displayNum, uint32_t value)
+{
+    uint8_t point_pos = 0;
+    uint8_t data[7];
+    int i;
+
+    //convert to array
+    for(i=0; i<7; i++) {
+        data[i] = value % 10;
+        value/=10;
+    }
+
+    //find 4 valid number
+    for(i=6; i>2; i--) {
+        if (data[i] != 0) {
+            break;
+        }
+    }
+
+    //find decimal position
+    point_pos+=6-i;
+
+    //set display data
+    int start = 1+4*displayNum;
+    for (int j=0; j<4; j++,i--) {
+        display_data[start+j] = numbers[data[i]];
+    }
+}
+
+
 //Send data to the TA6932. Uses spi_device_transmit, which waits until the transfer is complete.
-void spi_trassfer_single_byte(spi_device_handle_t spi, const uint8_t data) 
+void spi_trassfer_single_byte(const uint8_t data) 
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -90,7 +139,7 @@ void spi_trassfer_single_byte(spi_device_handle_t spi, const uint8_t data)
     assert(ret==ESP_OK);               //Should have had no issues.
 }
 
-void spi_trassfer_2bytes(spi_device_handle_t spi, const uint8_t command, const uint8_t data) 
+void spi_trassfer_2bytes(const uint8_t command, const uint8_t data) 
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -103,37 +152,69 @@ void spi_trassfer_2bytes(spi_device_handle_t spi, const uint8_t command, const u
     assert(ret==ESP_OK);               //Should have had no issues.
 }
 
-void spi_trassfer_display(spi_device_handle_t spi) 
+void spi_trassfer_display() 
 {
     esp_err_t ret;
-    spi_transaction_t t;
-    memset(&t, 0, sizeof(t));          //Zero out the transaction
-    t.length=17*8;                      //17bytes is 17*8 bits
-    t.tx_buffer=CODE;                   //command
-    ret=spi_device_transmit(spi, &t);  //Transmit!
+    spi_transaction_t trans[3];        //total 3 transactions
+    spi_transaction_t *rtrans;
+    memset(trans, 0, sizeof(trans));   //Zero out the transaction
+
+    //AUTO address command
+    trans[0].length=8;                                      //Command is 8 bits
+    trans[0].tx_data[0]=COMMAND_DATA_MODE_ADDRESS_AUTO;     //command
+    trans[0].flags=SPI_TRANS_USE_TXDATA;
+    ret=spi_device_queue_trans(spi, &trans[0], portMAX_DELAY);
     assert(ret==ESP_OK);               //Should have had no issues.
+
+    //Address + data
+    trans[1].length=17*8;                     //17bytes is 17*8 bits
+    trans[1].tx_buffer=display_data;          //command + data
+    ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
+    assert(ret==ESP_OK);               //Should have had no issues.
+
+    //Turn on display command
+    trans[2].length=8;                          //Command is 8 bits
+    trans[2].tx_data[0]=COMMAND_DISPLAY_ON;     //command
+    trans[2].flags=SPI_TRANS_USE_TXDATA;
+    ret=spi_device_queue_trans(spi, &trans[2], portMAX_DELAY);
+    assert(ret==ESP_OK);               //Should have had no issues.
+
+    //Wait for all 2 transactions to be done and get back the results.
+    for (int x=0; x<3; x++) {
+        ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
+        assert(ret==ESP_OK);
+    }
+
 }
 
-void display_numbers(spi_device_handle_t spi)
+void display_numbers()
 {
     uint8_t numbers[] = {
         NUMBER_0, NUMBER_1, NUMBER_2, NUMBER_3, NUMBER_4, NUMBER_5,
         NUMBER_6, NUMBER_7, NUMBER_8, NUMBER_9
     };
-    spi_trassfer_single_byte(spi, COMMAND_DATA_MODE_ADDRESS_FIX);
+    spi_trassfer_single_byte(COMMAND_DATA_MODE_ADDRESS_FIX);
     for (int i=0; i< 8; i++ ) {
         uint8_t address = COMMAND_ADDRESS_0 + i;
-        spi_trassfer_2bytes(spi, address, numbers[i]);
+        spi_trassfer_2bytes(address, numbers[i]);
     }
-    spi_trassfer_single_byte(spi, COMMAND_DISPLAY_ON);
+    spi_trassfer_single_byte(COMMAND_DISPLAY_ON);
 }
 
-void app_main()
+void display_loop()
+{
+    while(1) {
+        // display_numbers(spi);
+        spi_trassfer_display();
+        vTaskDelay(100/portTICK_RATE_MS);
+    }
+}
+
+void display_init()
 {
     printf("SPI Display!!!\n");
 
     esp_err_t ret;
-    spi_device_handle_t spi;
     spi_bus_config_t buscfg={
         .miso_io_num=PIN_NUM_MISO,
         .mosi_io_num=PIN_NUM_MOSI,
@@ -146,7 +227,7 @@ void app_main()
         .mode=3,                                //SPI mode 3
         .spics_io_num=PIN_NUM_CS,               //CS pin
         .cs_ena_posttrans=3,                    //Keep the CS low 3 cycles after transaction, to stop slave from missing the last bit when CS has less propagation delay than CLK
-        .queue_size=7,                          //We want to be able to queue 7 transactions at a time
+        .queue_size=5,                          //We want to be able to queue 5 transactions at a time
         .flags=SPI_DEVICE_TXBIT_LSBFIRST|SPI_DEVICE_RXBIT_LSBFIRST,
     };
     //Initialize the SPI bus
@@ -155,13 +236,7 @@ void app_main()
     //Attach the LCD to the SPI bus
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
     assert(ret==ESP_OK);
-    vTaskDelay(1000/portTICK_RATE_MS);
 
-    //Do display
-    printf("Start display loop!\n");
-
-    while(1) {
-        display_numbers(spi);
-        vTaskDelay(100/portTICK_RATE_MS);
-    }
+    //Create task
+    xTaskCreate(&display_loop, "display_task", 4096, NULL, 5, NULL);
 }
