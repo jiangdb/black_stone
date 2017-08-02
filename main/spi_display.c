@@ -47,6 +47,7 @@
 #define COMMAND_DISPLAY_OFF     0x80
 #define COMMAND_DISPLAY_ON      0x8C
 
+#define DECIMAL_POINT           0x80
 #define NUMBER_0                0x3F
 #define NUMBER_1                0x06
 #define NUMBER_2                0x5B
@@ -103,26 +104,35 @@ void setDisplayInteger(uint8_t displayNum, uint32_t value)
     uint8_t data[7];
     int i;
 
-    //convert to array
+    //make sure value has 7 digits
+    if (value >= 10000000) return;
+
+    //convert to array, LSB mode
     for(i=0; i<7; i++) {
         data[i] = value % 10;
         value/=10;
     }
 
     //find 4 valid number
-    for(i=6; i>2; i--) {
+    for(i=6; i>3; i--) {
         if (data[i] != 0) {
             break;
         }
     }
 
-    //find decimal position
+    //find decimal position, should be 0-3
     point_pos+=6-i;
 
     //set display data
     int start = 1+4*displayNum;
     for (int j=0; j<4; j++,i--) {
         display_data[start+j] = numbers[data[i]];
+    }
+
+    //set point
+    if (point_pos > 0) {
+        int pos = start + 3 - point_pos;
+        display_data[pos] |= DECIMAL_POINT;
     }
 }
 

@@ -16,11 +16,12 @@ extern void bt_init();
 extern void setDisplayInteger(uint8_t displayNum, uint32_t value);
 extern uint32_t channel_values[2];
 
-// static const char *TAG = "black_stone";
+static const char *TAG = "black_stone";
 
 void app_main()
 {
-    printf("BLACK STONE!!!\n");
+    // printf("BLACK STONE!!!\n");
+	ESP_LOGD(TAG, "Start!!!");
 
     /* Initialise wifi */
     //wifi_init();

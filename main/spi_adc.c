@@ -12,12 +12,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_log.h"
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 
 /*
 */
+#define TAG = "ADC";
 
 #define PIN_NUM_DATA 23
 #define PIN_NUM_CLK  18
@@ -88,7 +90,7 @@ void gpio_spi_switch(uint8_t mode)
 
 void spi_init()
 {
-    printf("spi_init !!!\n");
+    printf("%s: spi_init !!!\n", TAG);
     esp_err_t ret;
     spi_bus_config_t buscfg={
         .miso_io_num=-1,
@@ -115,7 +117,7 @@ void spi_init()
 
 void gpio_init()
 {
-    printf("gpio_init !!!\n");
+    printf("%s: gpio_init !!!\n", TAG);
     //GPIO config for the data line.
     gpio_config_t io_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
@@ -140,7 +142,7 @@ void adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
-        printf("data is ready!\n");
+        printf("%s: data is ready!\n", TAG);
 
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
@@ -179,7 +181,7 @@ void adc_loop()
 
 void adc_init()
 {
-    printf("CS1238 start!!!\n");
+    printf("%s: CS1238 start!!!\n", TAG);
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
