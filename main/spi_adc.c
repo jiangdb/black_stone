@@ -181,8 +181,8 @@ void adc_loop()
                 // printf("%d: 0x%08x\n", oldChannel, value);
                 channel_values[oldChannel] = CONVERT_INPUT(value);
                 // printf("%d: 0x%08x\n", oldChannel, channel_values[oldChannel]);
-                printf("%d: %d\n", oldChannel, channel_values[oldChannel]);
-                printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
+                // printf("%d: %d\n", oldChannel, channel_values[oldChannel]);
+                // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
             }
         }
 
