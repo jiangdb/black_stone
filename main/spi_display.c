@@ -45,7 +45,7 @@
 #define COMMAND_ADDRESS_15      0xCF
 
 #define COMMAND_DISPLAY_OFF     0x80
-#define COMMAND_DISPLAY_ON      0x8C
+#define COMMAND_DISPLAY_ON      0x8F
 
 #define DECIMAL_POINT           0x80
 #define NUMBER_0                0x3F
@@ -59,6 +59,7 @@
 #define NUMBER_8                0x7F
 #define NUMBER_9                0x6F
 
+/*
 DRAM_ATTR static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
     NUMBER_8,
@@ -78,6 +79,18 @@ DRAM_ATTR static uint8_t display_data[]={
     NUMBER_8,
     NUMBER_8,
 };
+*/
+static uint8_t display_data[]={
+    COMMAND_ADDRESS_0,
+    NUMBER_1,
+    NUMBER_2,
+    NUMBER_3,
+    NUMBER_4,
+    NUMBER_5,
+    NUMBER_6,
+    NUMBER_7,
+    NUMBER_8
+};
 
 static uint8_t numbers[] = {
     NUMBER_0,
@@ -89,6 +102,7 @@ static uint8_t numbers[] = {
     NUMBER_6,
     NUMBER_7,
     NUMBER_8,
+    NUMBER_9,
 };
 
 static spi_device_handle_t spi;
@@ -104,13 +118,28 @@ void setDisplayInteger(uint8_t displayNum, uint32_t value)
     uint8_t data[7];
     int i;
 
+    // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
+
     //make sure value has 7 digits
     if (value >= 10000000) return;
+
+    if (value == 0) {
+        //set display data
+        int start = 1+4*displayNum;
+        for (int j=0; j<4; j++,i--) {
+            display_data[start+j] = NUMBER_0;
+        }
+        return;
+    }
 
     //convert to array, LSB mode
     for(i=0; i<7; i++) {
         data[i] = value % 10;
         value/=10;
+    }
+
+    for(int c=0;c<7;c++){
+        // printf("data[%d] %d!!!\n", c, data[c]);
     }
 
     //find 4 valid number
@@ -122,6 +151,7 @@ void setDisplayInteger(uint8_t displayNum, uint32_t value)
 
     //find decimal position, should be 0-3
     point_pos+=6-i;
+    // printf("point_pos %d!!!\n", point_pos);
 
     //set display data
     int start = 1+4*displayNum;
@@ -134,6 +164,11 @@ void setDisplayInteger(uint8_t displayNum, uint32_t value)
         int pos = start + 3 - point_pos;
         display_data[pos] |= DECIMAL_POINT;
     }
+
+    for(int c = 0; c < 9; ++c) {
+        // printf("display_data %02x!!!\n", display_data[c]);
+    }
+
 }
 
 
@@ -177,7 +212,7 @@ void spi_trassfer_display()
     assert(ret==ESP_OK);               //Should have had no issues.
 
     //Address + data
-    trans[1].length=17*8;                     //17bytes is 17*8 bits
+    trans[1].length=9*8;                     //17bytes is 17*8 bits
     trans[1].tx_buffer=display_data;          //command + data
     ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
     assert(ret==ESP_OK);               //Should have had no issues.
@@ -216,7 +251,7 @@ void display_loop()
     while(1) {
         // display_numbers(spi);
         spi_trassfer_display();
-        vTaskDelay(100/portTICK_RATE_MS);
+        vTaskDelay(500/portTICK_RATE_MS);
     }
 }
 
@@ -248,5 +283,5 @@ void display_init()
     assert(ret==ESP_OK);
 
     //Create task
-    xTaskCreate(&display_loop, "display_task", 4096, NULL, 5, NULL);
+    //xTaskCreate(&display_loop, "display_task", 4096, NULL, 5, NULL);
 }

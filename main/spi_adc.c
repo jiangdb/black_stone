@@ -19,7 +19,7 @@
 
 /*
 */
-#define TAG = "ADC";
+#define TAG                   "ADC"
 
 #define PIN_NUM_DATA 23
 #define PIN_NUM_CLK  18
@@ -45,19 +45,20 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define VREF_HALF             1650000       //voltage in uv
-#define CONVERT_INPUT(X)      ((VREF_HALF*X)/0x7FFFFF)           //8388607 make sure we can read 4 digit after decimal
+#define VREF_HALF             1650000                            //voltage in uv
+#define CONVERT_INPUT(X)      (((double)VREF_HALF*X)/(128*0x7FFFFF))           //8388607 make sure we can read 4 digit after decimal
 
 static const uint8_t channels[]={
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_1|CH_SEL_A,
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_1|CH_SEL_B,
+    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_A,
+    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_B,
 };
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint8_t channelNum = 0;
-uint32_t channel_values[2] = {0,0};
+static uint32_t lastDataReadyTime;
+int32_t channel_values[2] = {0,0};
 
 /*
 This ISR is called when the data line goes low.
@@ -66,7 +67,6 @@ static void IRAM_ATTR gpio_data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
-    static uint32_t lastDataReadyTime;
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
     if (diff<1200000) return; //ignore everything <5ms after an earlier irq
@@ -79,11 +79,15 @@ static void IRAM_ATTR gpio_data_isr_handler(void* arg)
 
 void gpio_spi_switch(uint8_t mode)
 {
+    esp_err_t ret;
     if (mode == DATA_PIN_FUNC_GPIO) {
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
-        gpio_intr_enable(PIN_NUM_DATA);
+        lastDataReadyTime=xthal_get_ccount();
+        ret=gpio_intr_enable(PIN_NUM_DATA);
+        assert(ret==ESP_OK);
     }else if (mode == DATA_PIN_FUNC_SPI) {
-        gpio_intr_disable(PIN_NUM_DATA);
+        ret=gpio_intr_disable(PIN_NUM_DATA);
+        assert(ret==ESP_OK);
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
     }
 }
@@ -138,14 +142,14 @@ void adc_loop()
     esp_err_t ret;
     spi_transaction_t trans[2];
     spi_transaction_t *rtrans;
-    uint8_t oldChannel = 0; 
+    uint8_t oldChannel = 0;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
-        printf("%s: data is ready!\n", TAG);
-
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
+
+        // printf("%s: data is ready %d!\n", TAG, count++);
 
         memset(trans, 0, sizeof(trans));
         trans[0].rxlength=29;
@@ -168,11 +172,22 @@ void adc_loop()
             ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
             assert(ret==ESP_OK);
             if ( x==0 ) {
-                uint32_t value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+                int32_t value = 0;
+                if (rtrans->rx_data[0] & 0x80) {
+                    value = 0xFF<<24|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+                }else{
+                    value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+                }
+                // printf("%d: 0x%08x\n", oldChannel, value);
                 channel_values[oldChannel] = CONVERT_INPUT(value);
-                printf("%d: 0x%x%x%x%x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
+                // printf("%d: 0x%08x\n", oldChannel, channel_values[oldChannel]);
+                printf("%d: %d\n", oldChannel, channel_values[oldChannel]);
+                printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
             }
         }
+
+        vTaskDelay(10/portTICK_RATE_MS);
+        // printf("%s: enable int!\n", TAG);
 
         //Enable gpio again and wait for data
         gpio_spi_switch(DATA_PIN_FUNC_GPIO); 

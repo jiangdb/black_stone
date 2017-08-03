@@ -14,20 +14,21 @@ extern void display_init();
 extern void adc_init();
 extern void bt_init();
 extern void setDisplayInteger(uint8_t displayNum, uint32_t value);
-extern uint32_t channel_values[2];
+extern void spi_trassfer_display();
+extern int32_t channel_values[2];
 
 static const char *TAG = "black_stone";
-
+    
 void app_main()
 {
-    // printf("BLACK STONE!!!\n");
+    printf("BLACK STONE!!!\n");
 	ESP_LOGD(TAG, "Start!!!");
 
     /* Initialise wifi */
     //wifi_init();
 
     /* Initialise bluetooth */
-    bt_init();
+    // bt_init();
 
     /* Initialise adc */
     adc_init();
@@ -36,11 +37,17 @@ void app_main()
     display_init();
 
     while(1) {
+        vTaskDelay(300/portTICK_RATE_MS);
 
-    	for (int i=0; i<2; i++) {
-       		setDisplayInteger(i , channel_values[i]);
-    	}
+        for (int i=0; i<2; i++) {
+            int32_t value = channel_values[i] + 50;
+            if (value < 0) {
+                value = 0;
+            }
+            // printf("%d: %d\n", i, value);
+            setDisplayInteger(i , value);
+        }
 
-    	vTaskDelay(50/portTICK_RATE_MS);
+        spi_trassfer_display();
     }
 }
