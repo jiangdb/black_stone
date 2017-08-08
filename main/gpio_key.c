@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "timer.h"
 
 /**
  * Brief:
@@ -51,6 +52,12 @@ static void gpio_task_example(void* arg)
                     vTaskDelay(100/portTICK_RATE_MS);
                     gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
                     gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
+
+                    if (io_num == GPIO_INPUT_IO_KEY_LEFT) {
+                        bs_timer_start();
+                    }else{
+                        bs_timer_pause();
+                    }
                 }
             }
         }

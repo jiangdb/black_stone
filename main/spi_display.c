@@ -15,6 +15,7 @@
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
+#include "display.h"
 
 /*
 */
@@ -59,27 +60,10 @@
 #define NUMBER_8                0x7F
 #define NUMBER_9                0x6F
 
-/*
-DRAM_ATTR static uint8_t display_data[]={
-    COMMAND_ADDRESS_0,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-    NUMBER_8,
-};
-*/
+#define DIGITAL_NUMBER          4
+#define BATTERY_ADDRESS         13
+#define WIRELESS_ADDRESS        14
+
 static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
     NUMBER_1,
@@ -89,7 +73,13 @@ static uint8_t display_data[]={
     NUMBER_5,
     NUMBER_6,
     NUMBER_7,
-    NUMBER_8
+    NUMBER_8,
+    NUMBER_0,
+    NUMBER_0,
+    NUMBER_0|0x80,
+    NUMBER_0,
+    0x7F,
+    0x00,
 };
 
 static uint8_t numbers[] = {
@@ -105,72 +95,96 @@ static uint8_t numbers[] = {
     NUMBER_9,
 };
 
+static uint8_t percentages[] = {
+    0x0F,       //0
+    0x1F,       //25
+    0x3F,       //50
+    0x7F,       //75
+};
+
 static spi_device_handle_t spi;
 
-void setTime(uint32_t timeInSeconds)
+void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
 {
-
-}
-
-void setDisplayInteger(uint8_t displayNum, uint32_t value)
-{
-    uint8_t point_pos = 0;
-    uint8_t data[7];
+    uint8_t data[DIGITAL_NUMBER];
     int i;
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
 
-    //make sure value has 7 digits
-    if (value >= 10000000) return;
-
     if (value == 0) {
         //set display data
-        int start = 1+4*displayNum;
-        for (int j=0; j<4; j++,i--) {
+        int start = 1+DIGITAL_NUMBER*displayNum;
+        for (int j=0; j<DIGITAL_NUMBER; j++,i--) {
             display_data[start+j] = NUMBER_0;
+            if (j == precision) {
+                display_data[start+j] |= 0x80;
+            }
         }
         return;
     }
 
     //convert to array, LSB mode
-    for(i=0; i<7; i++) {
+    for(i=0; i<DIGITAL_NUMBER; i++) {
         data[i] = value % 10;
         value/=10;
     }
 
-    for(int c=0;c<7;c++){
-        // printf("data[%d] %d!!!\n", c, data[c]);
-    }
-
-    //find 4 valid number
-    for(i=6; i>3; i--) {
-        if (data[i] != 0) {
-            break;
+    //set display data
+    int start = 1+DIGITAL_NUMBER*displayNum;
+    for (int j=0; j<DIGITAL_NUMBER; j++) {
+        display_data[start+j] = numbers[data[j]];
+        if (j == precision) {
+            display_data[start+j] |= 0x80;
         }
     }
-
-    //find decimal position, should be 0-3
-    point_pos+=6-i;
-    // printf("point_pos %d!!!\n", point_pos);
-
-    //set display data
-    int start = 1+4*displayNum;
-    for (int j=0; j<4; j++,i--) {
-        display_data[start+j] = numbers[data[i]];
-    }
-
-    //set point
-    if (point_pos > 0) {
-        int pos = start + 3 - point_pos;
-        display_data[pos] |= DECIMAL_POINT;
-    }
-
-    for(int c = 0; c < 9; ++c) {
-        // printf("display_data %02x!!!\n", display_data[c]);
-    }
-
 }
 
+void setDisplayTime(uint32_t seconds)
+{
+    //max to 1 hr
+    if (seconds>3600) seconds = 3600;
+
+    uint8_t data[4];
+    int8_t mins = seconds/60;
+    seconds %= 60;
+    data[3] = seconds%10;
+    data[2] = seconds/10;
+    data[1] = mins%10;
+    data[0] = mins/10;
+
+    int start = 1+DIGITAL_NUMBER*2;
+    for (int i=0; i<4; i++) {
+        display_data[start+i] = numbers[data[i]];
+        if (i==2) {
+            display_data[start+i] |= 0x80;
+        }
+    }
+}
+
+void setBatteryLevel(int8_t percentage)
+{
+    if (percentage < 25) {
+        display_data[BATTERY_ADDRESS] = percentages[0];
+    }else if(percentage < 50){
+        display_data[BATTERY_ADDRESS] = percentages[1];
+    }else if(percentage < 75){
+        display_data[BATTERY_ADDRESS] = percentages[2];
+    }else{
+        display_data[BATTERY_ADDRESS] = percentages[3];
+    }
+}
+
+void setWifiSound(bool wifi, bool sound)
+{
+    uint8_t val = 0;
+    if (wifi) {
+        val|=1;
+    }
+    if (sound) {
+        val|=2;
+    }
+    display_data[WIRELESS_ADDRESS] = val;
+}
 
 //Send data to the TA6932. Uses spi_device_transmit, which waits until the transfer is complete.
 void spi_trassfer_single_byte(const uint8_t data) 
@@ -212,7 +226,7 @@ void spi_trassfer_display()
     assert(ret==ESP_OK);               //Should have had no issues.
 
     //Address + data
-    trans[1].length=9*8;                     //17bytes is 17*8 bits
+    trans[1].length=15*8;                     //15bytes is 15*8 bits
     trans[1].tx_buffer=display_data;          //command + data
     ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
     assert(ret==ESP_OK);               //Should have had no issues.
@@ -249,7 +263,6 @@ void display_numbers()
 void display_loop()
 {
     while(1) {
-        // display_numbers(spi);
         spi_trassfer_display();
         vTaskDelay(500/portTICK_RATE_MS);
     }
@@ -283,5 +296,5 @@ void display_init()
     assert(ret==ESP_OK);
 
     //Create task
-    //xTaskCreate(&display_loop, "display_task", 4096, NULL, 5, NULL);
+    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, NULL);
 }

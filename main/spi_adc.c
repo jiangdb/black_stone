@@ -16,16 +16,17 @@
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
+#include "queue_buffer.h"
 
 /*
 */
 #define TAG                   "ADC"
 
-#define PIN_NUM_DATA 23
-#define PIN_NUM_CLK  18
+#define PIN_NUM_DATA          23
+#define PIN_NUM_CLK           18
 
-#define DATA_PIN_FUNC_SPI   FUNC_GPIO23_VSPID
-#define DATA_PIN_FUNC_GPIO  FUNC_GPIO23_GPIO23
+#define DATA_PIN_FUNC_SPI     FUNC_GPIO23_VSPID
+#define DATA_PIN_FUNC_GPIO    FUNC_GPIO23_GPIO23
 
 #define REFO_ON               0x0<<6
 #define REFO_OFF              0x1<<6
@@ -45,20 +46,19 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define VREF_HALF             1650000                            //voltage in uv
-#define CONVERT_INPUT(X)      (((double)VREF_HALF*X)/(128*0x7FFFFF))           //8388607 make sure we can read 4 digit after decimal
-
 static const uint8_t channels[]={
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_A,
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_B,
+    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A,
+    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B,
 };
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
-static uint8_t channelNum = 0;
+// static uint8_t channelNum = 0;
 static uint32_t lastDataReadyTime;
 int32_t channel_values[2] = {0,0};
+queue_buffer_t dataQueueBuffer[2];
+int32_t dataBuffer[2][10];
 
 /*
 This ISR is called when the data line goes low.
@@ -82,6 +82,8 @@ void gpio_spi_switch(uint8_t mode)
     esp_err_t ret;
     if (mode == DATA_PIN_FUNC_GPIO) {
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
+        ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+        assert(ret==ESP_OK);
         lastDataReadyTime=xthal_get_ccount();
         ret=gpio_intr_enable(PIN_NUM_DATA);
         assert(ret==ESP_OK);
@@ -90,6 +92,62 @@ void gpio_spi_switch(uint8_t mode)
         assert(ret==ESP_OK);
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
     }
+}
+
+int32_t config(int8_t config)
+{
+    esp_err_t ret;
+    //Prepare spi receive buffer
+    spi_transaction_t trans[2];
+    spi_transaction_t *rtrans;
+
+    memset(trans, 0, sizeof(trans));
+    trans[0].rxlength=29;
+    trans[0].flags=SPI_TRANS_USE_RXDATA;
+    ret=spi_device_queue_trans(spi, &trans[0], portMAX_DELAY);
+    assert(ret==ESP_OK);
+
+    trans[1].length=17;
+    trans[1].tx_data[0]=0xCA;
+    trans[1].tx_data[1]=config;
+    trans[1].tx_data[2]=0x00;
+    trans[1].flags=SPI_TRANS_USE_TXDATA;
+    ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
+    assert(ret==ESP_OK);
+
+    int32_t value = 0;
+    //Wait for all 2 transactions to be done and get back the results.
+    for (int x=0; x<2; x++) {
+        ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
+        assert(ret==ESP_OK);
+        if ( x==0 ) {
+            if (rtrans->rx_data[0] & 0x80) {
+                value = 0xFF<<24|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+            }else{
+                value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+            }
+            // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
+        }
+    }
+    return value;
+}
+
+int32_t read_only()
+{
+    esp_err_t ret;
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));          //Zero out the transaction
+    t.rxlength=27;                     //Command is 8 bits
+    t.flags=SPI_TRANS_USE_RXDATA;      //The data is the cmd itself
+    ret=spi_device_transmit(spi, &t);  //Transmit!
+    assert(ret==ESP_OK);            //Should have had no issues.
+    int32_t value=0;
+    if (t.rx_data[0] & 0x80) {
+        value = 0xFF<<24|t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
+    }else{
+        value = t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
+    }
+    return value;
 }
 
 void spi_init()
@@ -104,7 +162,7 @@ void spi_init()
         .quadhd_io_num=-1
     };
     spi_device_interface_config_t devcfg={
-        .clock_speed_hz=1000000,                //Clock out at 1MHz
+        .clock_speed_hz=100000,                //Clock out at 100KHz
         .mode=1,                                //SPI mode 1
         .spics_io_num=-1,                       //CS pin
         .queue_size=2,                          //We want to be able to queue 2 transactions at a time
@@ -139,10 +197,10 @@ void gpio_init()
 
 void adc_loop()
 {
-    esp_err_t ret;
-    spi_transaction_t trans[2];
-    spi_transaction_t *rtrans;
-    uint8_t oldChannel = 0;
+    // esp_err_t ret;
+    // spi_transaction_t trans[2];
+    // spi_transaction_t *rtrans;
+    uint8_t ch = 0;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
@@ -150,7 +208,23 @@ void adc_loop()
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
 
         // printf("%s: data is ready %d!\n", TAG, count++);
+        // printf("%d\n", config());
 
+        if (ch == 0) {
+            uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
+            int32_t v = config(conf);
+            queue_buffer_push(&dataQueueBuffer[0], v);
+            channel_values[0] = v/100;
+            ch = 1;
+        }else{
+            uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
+            int32_t v = config(conf);
+            queue_buffer_push(&dataQueueBuffer[1], v);
+            channel_values[1] = v/100;
+            // printf("c_r[B]:%d\n", config(spi, conf));
+            ch = 0;
+        }
+        /*
         memset(trans, 0, sizeof(trans));
         trans[0].rxlength=29;
         trans[0].flags=SPI_TRANS_USE_RXDATA;
@@ -185,8 +259,9 @@ void adc_loop()
                 // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
             }
         }
+        */
 
-        vTaskDelay(10/portTICK_RATE_MS);
+        // vTaskDelay(10/portTICK_RATE_MS);
         // printf("%s: enable int!\n", TAG);
 
         //Enable gpio again and wait for data
@@ -206,6 +281,10 @@ void adc_init()
 
     //GPIO config
     gpio_init();
+
+    // Queue Buffer init
+    queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], 10);
+    queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], 10);
 
     //Create task
     xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, NULL);

@@ -9,15 +9,14 @@
 #include "esp_event.h"
 #include "esp_event_loop.h"
 #include "bt.h"
+#include "display.h"
+#include "timer.h"
 
 #define GPIO_LED_IO         19
-
 
 extern void display_init();
 extern void adc_init();
 extern void bt_init();
-extern void setDisplayInteger(uint8_t displayNum, uint32_t value);
-extern void spi_trassfer_display();
 extern int32_t channel_values[2];
 extern void gpio_key_init();
 
@@ -64,17 +63,19 @@ void app_main()
     /* Initialise key */
     gpio_key_init();
 
-    while(1) {
-        vTaskDelay(250/portTICK_RATE_MS);
+    /* Initialise timer */
+    bs_timer_init();
 
+    while(1) {
+        vTaskDelay(1000/portTICK_RATE_MS);
+/*
         for (int i=0; i<2; i++) {
             int32_t value = channel_values[i] + 50;
             if (value < 0) {
                 value = 0;
             }
-            setDisplayInteger(i , value);
+            setDisplayNumber(i , value, 1);
         }
-
-        spi_trassfer_display();
+        */
     }
 }
