@@ -107,16 +107,15 @@ static spi_device_handle_t spi;
 void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
 {
     uint8_t data[DIGITAL_NUMBER];
-    int i;
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
 
     if (value == 0) {
         //set display data
         int start = 1+DIGITAL_NUMBER*displayNum;
-        for (int j=0; j<DIGITAL_NUMBER; j++,i--) {
+        for (int j=0; j<DIGITAL_NUMBER; j++) {
             display_data[start+j] = NUMBER_0;
-            if (j == precision) {
+            if (j == precision && precision!=0) {
                 display_data[start+j] |= 0x80;
             }
         }
@@ -124,7 +123,7 @@ void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
     }
 
     //convert to array, LSB mode
-    for(i=0; i<DIGITAL_NUMBER; i++) {
+    for(int i=DIGITAL_NUMBER-1; i>=0; i--) {
         data[i] = value % 10;
         value/=10;
     }
@@ -133,7 +132,7 @@ void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
     int start = 1+DIGITAL_NUMBER*displayNum;
     for (int j=0; j<DIGITAL_NUMBER; j++) {
         display_data[start+j] = numbers[data[j]];
-        if (j == precision) {
+        if (j == precision && precision!=0) {
             display_data[start+j] |= 0x80;
         }
     }
@@ -264,7 +263,7 @@ void display_loop()
 {
     while(1) {
         spi_trassfer_display();
-        vTaskDelay(500/portTICK_RATE_MS);
+        vTaskDelay(100/portTICK_RATE_MS);
     }
 }
 

@@ -46,6 +46,8 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
+#define BUFFER_SIZE           3
+
 static const uint8_t channels[]={
     0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A,
     0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B,
@@ -58,7 +60,7 @@ static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
 int32_t channel_values[2] = {0,0};
 queue_buffer_t dataQueueBuffer[2];
-int32_t dataBuffer[2][10];
+int32_t dataBuffer[2][BUFFER_SIZE];
 
 /*
 This ISR is called when the data line goes low.
@@ -214,13 +216,13 @@ void adc_loop()
             uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
             int32_t v = config(conf);
             queue_buffer_push(&dataQueueBuffer[0], v);
-            channel_values[0] = v/100;
+            // channel_values[0] = v;
             ch = 1;
         }else{
             uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
             int32_t v = config(conf);
             queue_buffer_push(&dataQueueBuffer[1], v);
-            channel_values[1] = v/100;
+            // channel_values[1] = v;
             // printf("c_r[B]:%d\n", config(spi, conf));
             ch = 0;
         }
@@ -261,7 +263,7 @@ void adc_loop()
         }
         */
 
-        // vTaskDelay(10/portTICK_RATE_MS);
+        vTaskDelay(10/portTICK_RATE_MS);
         // printf("%s: enable int!\n", TAG);
 
         //Enable gpio again and wait for data
@@ -283,8 +285,8 @@ void adc_init()
     gpio_init();
 
     // Queue Buffer init
-    queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], 10);
-    queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], 10);
+    queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], BUFFER_SIZE);
+    queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], BUFFER_SIZE);
 
     //Create task
     xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, NULL);

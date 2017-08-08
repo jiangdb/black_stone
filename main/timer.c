@@ -46,7 +46,7 @@ void IRAM_ATTR timer_group0_isr(void *para)
         TIMERG0.int_clr_timers.t1 = 1;
         if (timer_enable) {
             /* set time in display */
-            setDisplayTime(seconds++);
+            setDisplayTime(++seconds);
             /*For a auto-reload timer, we still need to set alarm_en bit if we want to enable alarm again.*/
             TIMERG0.hw_timer[timer_idx].config.alarm_en = 1;
         }
@@ -89,6 +89,7 @@ void bs_timer_init()
 void bs_timer_start()
 {
     /*Start timer counter*/
+    timer_set_counter_value(timer_group, timer_idx, 0x00000000ULL);
     timer_start(timer_group, timer_idx);
     timer_enable = true;
 }
@@ -101,4 +102,6 @@ void bs_timer_pause()
 void bs_timer_stop()
 {
     timer_enable = false;
+    seconds = 0;
+    setDisplayTime(seconds);
 }

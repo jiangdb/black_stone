@@ -11,6 +11,7 @@
 #include "bt.h"
 #include "display.h"
 #include "timer.h"
+#include "queue_buffer.h"
 
 #define GPIO_LED_IO         19
 
@@ -18,7 +19,9 @@ extern void display_init();
 extern void adc_init();
 extern void bt_init();
 extern int32_t channel_values[2];
+extern queue_buffer_t dataQueueBuffer[2];
 extern void gpio_key_init();
+extern int32_t get_weight(int32_t adcValue);
 
 static const char *TAG = "black_stone";
 
@@ -67,14 +70,16 @@ void app_main()
     bs_timer_init();
 
     while(1) {
-        vTaskDelay(1000/portTICK_RATE_MS);
-/*
-        for (int i=0; i<2; i++) {
-            int32_t value = channel_values[i] + 50;
-            if (value < 0) {
-                value = 0;
-            }
-            setDisplayNumber(i , value, 1);
+        vTaskDelay(100/portTICK_RATE_MS);
+        // printf("%d\n", queue_average(&dataQueueBuffer[0]));
+        int32_t weight = get_weight(queue_average(&dataQueueBuffer[0])/100);
+        // int32_t weight = get_weight(channel_values[0]/100);
+        setDisplayNumber(0, weight, 0);
+        /*
+        for (int i = 0; i < 2; ++i)
+        {
+            int32_t value = queue_average(&dataQueueBuffer[i]);
+            printf("%d\n", value);
         }
         */
     }

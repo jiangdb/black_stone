@@ -56,7 +56,7 @@ static void gpio_task_example(void* arg)
                     if (io_num == GPIO_INPUT_IO_KEY_LEFT) {
                         bs_timer_start();
                     }else{
-                        bs_timer_pause();
+                        bs_timer_stop();
                     }
                 }
             }
