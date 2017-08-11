@@ -142,7 +142,7 @@ int32_t read_only()
     t.rxlength=27;                     //Command is 8 bits
     t.flags=SPI_TRANS_USE_RXDATA;      //The data is the cmd itself
     ret=spi_device_transmit(spi, &t);  //Transmit!
-    assert(ret==ESP_OK);            //Should have had no issues.
+    assert(ret==ESP_OK);               //Should have had no issues.
     int32_t value=0;
     if (t.rx_data[0] & 0x80) {
         value = 0xFF<<24|t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
@@ -199,18 +199,12 @@ void gpio_init()
 
 void adc_loop()
 {
-    // esp_err_t ret;
-    // spi_transaction_t trans[2];
-    // spi_transaction_t *rtrans;
     uint8_t ch = 0;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
-
-        // printf("%s: data is ready %d!\n", TAG, count++);
-        // printf("%d\n", config());
 
         if (ch == 0) {
             uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
@@ -226,45 +220,8 @@ void adc_loop()
             // printf("c_r[B]:%d\n", config(spi, conf));
             ch = 0;
         }
-        /*
-        memset(trans, 0, sizeof(trans));
-        trans[0].rxlength=29;
-        trans[0].flags=SPI_TRANS_USE_RXDATA;
-        ret=spi_device_queue_trans(spi, &trans[0], portMAX_DELAY);
-        assert(ret==ESP_OK);
-
-        oldChannel = channelNum;
-        channelNum = channelNum==1?0:1;
-        trans[1].length=17;
-        trans[1].tx_data[0]=0xCA;
-        trans[1].tx_data[1]=channels[channelNum];
-        trans[1].tx_data[2]=0x00;
-        trans[1].flags=SPI_TRANS_USE_TXDATA;
-        ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
-        assert(ret==ESP_OK);
-
-        //Wait for all 2 transactions to be done and get back the results.
-        for (int x=0; x<2; x++) {
-            ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
-            assert(ret==ESP_OK);
-            if ( x==0 ) {
-                int32_t value = 0;
-                if (rtrans->rx_data[0] & 0x80) {
-                    value = 0xFF<<24|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
-                }else{
-                    value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
-                }
-                // printf("%d: 0x%08x\n", oldChannel, value);
-                channel_values[oldChannel] = CONVERT_INPUT(value);
-                // printf("%d: 0x%08x\n", oldChannel, channel_values[oldChannel]);
-                // printf("%d: %d\n", oldChannel, channel_values[oldChannel]);
-                // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
-            }
-        }
-        */
 
         vTaskDelay(10/portTICK_RATE_MS);
-        // printf("%s: enable int!\n", TAG);
 
         //Enable gpio again and wait for data
         gpio_spi_switch(DATA_PIN_FUNC_GPIO); 

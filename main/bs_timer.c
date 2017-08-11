@@ -16,7 +16,7 @@
 #include "driver/periph_ctrl.h"
 #include "driver/timer.h"
 #include "display.h"
-#include "timer.h"
+#include "bs_timer.h"
 
 #define TIMER_INTR_SEL TIMER_INTR_LEVEL  /*!< Timer level interrupt */
 #define TIMER_GROUP    TIMER_GROUP_0     /*!< Test on timer group 0 */
@@ -88,20 +88,30 @@ void bs_timer_init()
 
 void bs_timer_start()
 {
-    /*Start timer counter*/
-    timer_set_counter_value(timer_group, timer_idx, 0x00000000ULL);
     timer_start(timer_group, timer_idx);
     timer_enable = true;
+}
+
+void bs_timer_stop()
+{
+    timer_pause(timer_group, timer_idx);
+    timer_set_counter_value(timer_group, timer_idx, 0x00000000ULL);
+    seconds = 0;
+    setDisplayTime(seconds);
+    timer_enable = false;
 }
 
 void bs_timer_pause()
 {
     timer_pause(timer_group, timer_idx);
+    timer_enable = false;
 }
 
-void bs_timer_stop()
+void bs_timer_toggle()
 {
-    timer_enable = false;
-    seconds = 0;
-    setDisplayTime(seconds);
+    if (!timer_enable){
+        bs_timer_start();
+    }else{
+        bs_timer_pause();
+    }
 }

@@ -59,6 +59,7 @@
 #define NUMBER_7                0x07
 #define NUMBER_8                0x7F
 #define NUMBER_9                0x6F
+#define NUMBER_OFF              0x00
 
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
@@ -106,7 +107,7 @@ static spi_device_handle_t spi;
 
 void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
 {
-    uint8_t data[DIGITAL_NUMBER];
+    int8_t data[DIGITAL_NUMBER];
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
 
@@ -123,15 +124,21 @@ void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
     }
 
     //convert to array, LSB mode
+    memset(data, -1, sizeof(data));
     for(int i=DIGITAL_NUMBER-1; i>=0; i--) {
         data[i] = value % 10;
         value/=10;
+        if (value==0) break;
     }
 
     //set display data
     int start = 1+DIGITAL_NUMBER*displayNum;
     for (int j=0; j<DIGITAL_NUMBER; j++) {
-        display_data[start+j] = numbers[data[j]];
+        if (data[j]==-1){
+            display_data[start+j] = NUMBER_OFF;
+        }else{
+            display_data[start+j] = numbers[data[j]];
+        }
         if (j == precision && precision!=0) {
             display_data[start+j] |= 0x80;
         }

@@ -10,20 +10,23 @@
 #include "esp_event_loop.h"
 #include "bt.h"
 #include "display.h"
-#include "timer.h"
+#include "bs_timer.h"
 #include "queue_buffer.h"
+#include "key_event.h"
+#include "calibration.h"
 
 #define GPIO_LED_IO         19
 
 extern void display_init();
 extern void adc_init();
 extern void bt_init();
-extern int32_t channel_values[2];
-extern queue_buffer_t dataQueueBuffer[2];
 extern void gpio_key_init();
-extern int32_t get_weight(int32_t adcValue);
+extern void bs_wifi_init();
+extern queue_buffer_t dataQueueBuffer[2];
 
 static const char *TAG = "black_stone";
+
+static int8_t test_channel = 0;
 
 void led_on()
 {
@@ -42,6 +45,26 @@ void led_on()
     gpio_set_level(GPIO_LED_IO, 1);
 }
 
+void handle_key_event(key_event_t keyEvent)
+{
+    switch(keyEvent.key_type){
+        case TIMER_KEY:
+            if (keyEvent.key_value == KEY_DOWN) {
+                bs_timer_toggle();            
+            }
+            break;
+        case CLEAR_KEY:
+            if (keyEvent.key_value == KEY_DOWN) {
+                int32_t weight1 = queue_average(&dataQueueBuffer[0])/100;
+                int32_t weight2 = queue_average(&dataQueueBuffer[1])/100;
+                printf("%d: %d\n", weight1, weight2);
+                setZero(weight1,weight2);
+            }            
+            break;
+        default:
+            break;
+    }
+}
 
 void app_main()
 {
@@ -52,10 +75,10 @@ void app_main()
     led_on();
 
     /* Initialise wifi */
-    //wifi_init();
+    bs_wifi_init();
 
     /* Initialise bluetooth */
-    // bt_init();
+    bt_init();
 
     /* Initialise adc */
     adc_init();
@@ -71,16 +94,14 @@ void app_main()
 
     while(1) {
         vTaskDelay(100/portTICK_RATE_MS);
-        // printf("%d\n", queue_average(&dataQueueBuffer[0]));
-        int32_t weight = get_weight(queue_average(&dataQueueBuffer[0])/100);
-        // int32_t weight = get_weight(channel_values[0]/100);
-        setDisplayNumber(0, weight, 0);
-        /*
+        // printf("%d\n", queue_average(&dataQueueBuffer[test_channel]));
         for (int i = 0; i < 2; ++i)
         {
-            int32_t value = queue_average(&dataQueueBuffer[i]);
-            printf("%d\n", value);
+            // printf("%d: %d\n", i, queue_average(&dataQueueBuffer[i]));
+            int32_t weight = get_weight(queue_average(&dataQueueBuffer[i])/100, i);
+            // printf("%d\n", weight1);
+            // int32_t weight = get_weight(channel_values[0]/100);
+            setDisplayNumber(i, weight, 0);
         }
-        */
     }
 }

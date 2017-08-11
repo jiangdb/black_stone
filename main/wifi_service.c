@@ -10,7 +10,7 @@
 #include "esp_event_loop.h"
 #include "bt.h"
 
-static const char *TAG = "black_stone";
+static const char *TAG = "bs_wifi";
 
 esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 {
@@ -33,7 +33,7 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
-static void wifi_init()
+void bs_wifi_init()
 {
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
@@ -43,8 +43,8 @@ static void wifi_init()
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     wifi_config_t sta_config = {
         .sta = {
-            .ssid = "8SIAN2F",
-            .password = "8sianmedianetwork",
+            .ssid = "TM302",
+            .password = "timemore123",
             .bssid_set = false
         }
     };
