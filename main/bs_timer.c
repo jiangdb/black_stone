@@ -22,11 +22,7 @@
 #define TIMER_GROUP    TIMER_GROUP_0     /*!< Test on timer group 0 */
 #define TIMER_DIVIDER   80               /*!< Hardware timer clock divider */
 #define TIMER_SCALE    (TIMER_BASE_CLK / TIMER_DIVIDER)  /*!< used to calculate counter value */
-#define TIMER_FINE_ADJ   (1.4*(TIMER_BASE_CLK / TIMER_DIVIDER)/1000000) /*!< used to compensate alarm value */
-#define TIMER_INTERVAL0_SEC   (3.4179)   /*!< test interval for timer 0 */
 #define TIMER_INTERVAL1_SEC   (1)   /*!< test interval for timer 1 */
-#define TEST_WITHOUT_RELOAD   0   /*!< example of auto-reload mode */
-#define TEST_WITH_RELOAD   1      /*!< example without auto-reload mode */
 
 static uint32_t seconds=0;
 static bool timer_enable=false;
@@ -94,11 +90,13 @@ void bs_timer_start()
 
 void bs_timer_stop()
 {
-    timer_pause(timer_group, timer_idx);
-    timer_set_counter_value(timer_group, timer_idx, 0x00000000ULL);
-    seconds = 0;
-    setDisplayTime(seconds);
-    timer_enable = false;
+    if (timer_enable) {
+        timer_pause(timer_group, timer_idx);
+        timer_set_counter_value(timer_group, timer_idx, 0x00000000ULL);
+        seconds = 0;
+        setDisplayTime(seconds);
+        timer_enable = false;
+    }
 }
 
 void bs_timer_pause()

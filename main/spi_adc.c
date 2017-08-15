@@ -47,6 +47,7 @@
 #define CH_SEL_SHORT          0x3
 
 #define BUFFER_SIZE           3
+#define CALIBRATION_BUFFER_SIZE   10
 
 static const uint8_t channels[]={
     0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A,
@@ -56,11 +57,13 @@ static const uint8_t channels[]={
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
-// static uint8_t channelNum = 0;
 static uint32_t lastDataReadyTime;
-int32_t channel_values[2] = {0,0};
+static bool calibration_enable = false;
 queue_buffer_t dataQueueBuffer[2];
 int32_t dataBuffer[2][BUFFER_SIZE];
+
+queue_buffer_t calibrationQueueBuffer[2];
+int32_t calibrationBuffer[2][CALIBRATION_BUFFER_SIZE];
 
 /*
 This ISR is called when the data line goes low.
@@ -79,7 +82,7 @@ static void IRAM_ATTR gpio_data_isr_handler(void* arg)
     if (mustYield) portYIELD_FROM_ISR();
 }
 
-void gpio_spi_switch(uint8_t mode)
+static void gpio_spi_switch(uint8_t mode)
 {
     esp_err_t ret;
     if (mode == DATA_PIN_FUNC_GPIO) {
@@ -96,7 +99,7 @@ void gpio_spi_switch(uint8_t mode)
     }
 }
 
-int32_t config(int8_t config)
+static int32_t config(int8_t config)
 {
     esp_err_t ret;
     //Prepare spi receive buffer
@@ -123,18 +126,26 @@ int32_t config(int8_t config)
         ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
         assert(ret==ESP_OK);
         if ( x==0 ) {
+            /*
             if (rtrans->rx_data[0] & 0x80) {
                 value = 0xFF<<24|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
             }else{
                 value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
             }
+            */
+            if (rtrans->rx_data[0] & 0x80) {
+                value = 0xFFFF<<16|rtrans->rx_data[0]<<8|rtrans->rx_data[1];
+            }else{
+                value = rtrans->rx_data[0]<<8|rtrans->rx_data[1];
+            }
+            // printf("adc value: %d\n", value);
             // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
         }
     }
     return value;
 }
 
-int32_t read_only()
+static int32_t read_only()
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -144,15 +155,22 @@ int32_t read_only()
     ret=spi_device_transmit(spi, &t);  //Transmit!
     assert(ret==ESP_OK);               //Should have had no issues.
     int32_t value=0;
+    /*
     if (t.rx_data[0] & 0x80) {
         value = 0xFF<<24|t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
     }else{
         value = t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
     }
+    */
+    if (t.rx_data[0] & 0x80) {
+        value = 0xFFFF<<16|t.rx_data[0]<<8|t.rx_data[1];
+    }else{
+        value = t.rx_data[0]<<8|t.rx_data[1];
+    }
     return value;
 }
 
-void spi_init()
+static void spi_init()
 {
     printf("%s: spi_init !!!\n", TAG);
     esp_err_t ret;
@@ -179,7 +197,7 @@ void spi_init()
     assert(ret==ESP_OK);
 }
 
-void gpio_init()
+static void adc_gpio_init()
 {
     printf("%s: gpio_init !!!\n", TAG);
     //GPIO config for the data line.
@@ -197,9 +215,11 @@ void gpio_init()
     gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
 }
 
-void adc_loop()
+static void adc_loop()
 {
+    uint8_t conf = 0;
     uint8_t ch = 0;
+    int32_t v = 0;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
@@ -207,17 +227,22 @@ void adc_loop()
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
 
         if (ch == 0) {
-            uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
-            int32_t v = config(conf);
-            queue_buffer_push(&dataQueueBuffer[0], v);
-            // channel_values[0] = v;
+            conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
+            v = config(conf);
+            if (calibration_enable) {
+                queue_buffer_push(&calibrationQueueBuffer[ch], v);
+            }else{
+                queue_buffer_push(&dataQueueBuffer[ch], v);
+            }
             ch = 1;
         }else{
-            uint8_t conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
-            int32_t v = config(conf);
-            queue_buffer_push(&dataQueueBuffer[1], v);
-            // channel_values[1] = v;
-            // printf("c_r[B]:%d\n", config(spi, conf));
+            conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
+            v = config(conf);
+            if (calibration_enable) {
+                queue_buffer_push(&calibrationQueueBuffer[ch], v);
+            }else{
+                queue_buffer_push(&dataQueueBuffer[ch], v);
+            }
             ch = 0;
         }
 
@@ -239,12 +264,22 @@ void adc_init()
     spi_init();
 
     //GPIO config
-    gpio_init();
+    adc_gpio_init();
 
     // Queue Buffer init
+    memset(dataBuffer,0,sizeof(dataBuffer));
     queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], BUFFER_SIZE);
     queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], BUFFER_SIZE);
 
+    memset(calibrationQueueBuffer,0,sizeof(calibrationQueueBuffer));
+    queue_buffer_init(&calibrationQueueBuffer[0], calibrationBuffer[0], CALIBRATION_BUFFER_SIZE);
+    queue_buffer_init(&calibrationQueueBuffer[1], calibrationBuffer[1], CALIBRATION_BUFFER_SIZE);
+
     //Create task
     xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, NULL);
+}
+
+void adc_calibration(bool enable)
+{
+    calibration_enable = enable;
 }

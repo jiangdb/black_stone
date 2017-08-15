@@ -16,9 +16,12 @@
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 #include "display.h"
+#include "calibration.h"
+#include "queue_buffer.h"
 
 /*
 */
+extern queue_buffer_t dataQueueBuffer[2];
 
 #define PIN_NUM_MISO 13
 #define PIN_NUM_MOSI 12
@@ -80,7 +83,7 @@ static uint8_t display_data[]={
     NUMBER_0|0x80,
     NUMBER_0,
     0x7F,
-    0x00,
+    0x02,
 };
 
 static uint8_t numbers[] = {
@@ -105,21 +108,20 @@ static uint8_t percentages[] = {
 
 static spi_device_handle_t spi;
 
-void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
+void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
 {
     int8_t data[DIGITAL_NUMBER];
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
 
-    if (value == 0) {
-        //set display data
+    if (value <= 0) {
+        //show 0.0
         int start = 1+DIGITAL_NUMBER*displayNum;
-        for (int j=0; j<DIGITAL_NUMBER; j++) {
-            display_data[start+j] = NUMBER_0;
-            if (j == precision && precision!=0) {
-                display_data[start+j] |= 0x80;
-            }
-        }
+        display_data[start] = NUMBER_OFF;
+        display_data[start+1] = NUMBER_OFF;
+        display_data[start+2] = NUMBER_0;
+        display_data[start+2] |= 0x80;
+        display_data[start+3] = NUMBER_0;
         return;
     }
 
@@ -139,7 +141,7 @@ void setDisplayNumber(uint8_t displayNum, uint32_t value, int8_t precision)
         }else{
             display_data[start+j] = numbers[data[j]];
         }
-        if (j == precision && precision!=0) {
+        if (j == (DIGITAL_NUMBER-precision-1) && precision!=0) {
             display_data[start+j] |= 0x80;
         }
     }

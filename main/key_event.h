@@ -1,8 +1,8 @@
 #include <stdio.h>
 
 /* KEY TYPE */
-#define TIMER_KEY	0
-#define CLEAR_KEY   1
+#define TIMER_KEY	1
+#define CLEAR_KEY   2
 
 /* KEY VALUE */
 #define KEY_UP		0

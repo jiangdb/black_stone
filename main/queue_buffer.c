@@ -3,7 +3,7 @@
 
 #define CHECK_NULL(x)	if ((x) == NULL) return false;
 
-bool queue_buffer_init(queue_buffer_t* f, int32_t* pBuf, uint32_t size)
+bool queue_buffer_init(queue_buffer_t* f, int32_t* pBuf, int32_t size)
 {
 	CHECK_NULL(f)
   f->head = 0;
@@ -17,12 +17,15 @@ void queue_buffer_push(queue_buffer_t* f, int32_t data)
 {
   CHECK_NULL(f)
 
+  // printf("queue push to: %d !\n", f->head);
+
   f->pData[f->head] = data;
   f->head++;
   if (f->head >= f->size) {
     f->head=0;
     f->full=true;
   }
+  // printf("next to: %d !\n", f->head);
 }
 
 int32_t queue_average(queue_buffer_t* f)

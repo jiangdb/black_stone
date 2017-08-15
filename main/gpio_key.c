@@ -43,31 +43,80 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
 }
 
+void beap(int wait, int duration)
+{
+    if (wait > 0) {
+        vTaskDelay(wait/portTICK_RATE_MS);
+    }
+    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);
+    vTaskDelay(duration/portTICK_RATE_MS);
+    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
+}
+
+static void beap_vibrate()
+{
+    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);
+    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 1);
+    vTaskDelay(100/portTICK_RATE_MS);
+    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
+    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
+}
+
 static void gpio_task_example(void* arg)
 {
     uint32_t io_num;
+    int tick[2]= {-1, -1};
+    TickType_t tick_type = portMAX_DELAY;
+
     while(1) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+        if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
-            key_event_t keyEvent;
-            keyEvent.key_value = val==1?KEY_DOWN:KEY_UP;
-            // printf("GPIO[%d] intr, val: %d\n", io_num, val);
+            // printf("gpio_key(%d): %d !!!\n", io_num, val);
             if (io_num == GPIO_INPUT_IO_KEY_LEFT || io_num == GPIO_INPUT_IO_KEY_RIGHT ) {
+                int tick_value = -1;
+
+                //beap and vibrate
                 if (val == 1) {
-                    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);
-                    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 1);
-                    vTaskDelay(100/portTICK_RATE_MS);
-                    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
-                    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
+                    beap_vibrate();
+                    tick_value = 0;
                 }
+
+                // detect key
+                key_event_t keyEvent;
+                keyEvent.key_value = val==1?KEY_DOWN:KEY_UP;
                 if (io_num == GPIO_INPUT_IO_KEY_LEFT) {
                     keyEvent.key_type = TIMER_KEY;
-                }else{
+                    tick[0] = tick_value;
+                } else {
                     keyEvent.key_type = CLEAR_KEY;
+                    tick[1] = tick_value;
                 }
                 handle_key_event(keyEvent);
+
+                if (tick[0] == -1 && tick[1] == -1) {
+                    //stop tick
+                    tick_type = portMAX_DELAY;
+                } else {
+                    //start tick
+                    tick_type = ( TickType_t ) 0;
+                }
             }
         }
+        for (int i = 0; i < 2; ++i)
+        {
+            if (tick[i] >= 0) {
+                tick[i]++;
+                if (tick[i] > 10) {
+                    //50*10 ms
+                    key_event_t keyEvent;
+                    keyEvent.key_value = KEY_HOLD;
+                    keyEvent.key_type = (i==0?TIMER_KEY:CLEAR_KEY);
+                    handle_key_event(keyEvent);
+                    tick[i] = 1;
+                }
+            }
+        }
+        vTaskDelay(50/portTICK_RATE_MS);
     }
 }
 
@@ -87,8 +136,8 @@ void gpio_key_init()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
 
-    //interrupt of rising edge
-    io_conf.intr_type = GPIO_INTR_POSEDGE;
+    //interrupt of both edge
+    io_conf.intr_type = GPIO_INTR_ANYEDGE;
     //bit mask of the pins, use GPIO4/5 here
     io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
     //set as input mode    

@@ -14,19 +14,29 @@
 #include "queue_buffer.h"
 #include "key_event.h"
 #include "calibration.h"
+#include "config.h"
 
 #define GPIO_LED_IO         19
+#define WORKING_MODE_NORMAL         0
+#define WORKING_MODE_CALIBRATION    1
 
 extern void display_init();
 extern void adc_init();
 extern void bt_init();
 extern void gpio_key_init();
 extern void bs_wifi_init();
+extern void beap(int wait, int duration);
+extern void set_calibration(int index, int32_t channel0, int32_t channel1);
+extern void adc_calibration(bool enable);
 extern queue_buffer_t dataQueueBuffer[2];
+extern queue_buffer_t calibrationQueueBuffer[2];
+
 
 static const char *TAG = "black_stone";
-
-static int8_t test_channel = 0;
+static int working_mode = WORKING_MODE_NORMAL;
+static int calibrate_tick = -1;
+static int calibrate_index = 0;
+static int clear_hold = 0;
 
 void led_on()
 {
@@ -47,22 +57,41 @@ void led_on()
 
 void handle_key_event(key_event_t keyEvent)
 {
-    switch(keyEvent.key_type){
-        case TIMER_KEY:
-            if (keyEvent.key_value == KEY_DOWN) {
-                bs_timer_toggle();            
-            }
-            break;
-        case CLEAR_KEY:
-            if (keyEvent.key_value == KEY_DOWN) {
-                int32_t weight1 = queue_average(&dataQueueBuffer[0])/100;
-                int32_t weight2 = queue_average(&dataQueueBuffer[1])/100;
-                printf("%d: %d\n", weight1, weight2);
-                setZero(weight1,weight2);
-            }            
-            break;
-        default:
-            break;
+    if (working_mode == WORKING_MODE_NORMAL) {
+        printf("%s: handle key evnet(%d, %d) !!!\n", TAG, keyEvent.key_type, keyEvent.key_value);
+        switch(keyEvent.key_type){
+            case TIMER_KEY:
+                if (keyEvent.key_value == KEY_DOWN) {
+                    bs_timer_toggle();
+                }else if (keyEvent.key_value == KEY_HOLD) {
+                    bs_timer_stop();
+                }
+                break;
+            case CLEAR_KEY:
+                if (keyEvent.key_value == KEY_DOWN) {
+                    int32_t weight1 = queue_average(&dataQueueBuffer[0]);
+                    int32_t weight2 = queue_average(&dataQueueBuffer[1]);
+                    printf("%d: %d\n", weight1, weight2);
+                    set_zero(weight1,weight2);
+                    clear_hold = 0;
+                } else if (keyEvent.key_value == KEY_HOLD) {
+                    clear_hold++;
+                    if (clear_hold >= 10) {
+                        printf("enter calibration mode\n");
+                        beap(0, 200);
+                        working_mode = WORKING_MODE_CALIBRATION;
+                        adc_calibration(true);
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    } else {
+        printf("%s: handle key evnet(%d, %d) !!!\n", TAG, keyEvent.key_type, keyEvent.key_value);
+        if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
+            calibrate_tick = 0;
+        }
     }
 }
 
@@ -74,11 +103,16 @@ void app_main()
     /* led */
     led_on();
 
+    /* config */
+    config_init();
+    get_zero();
+    get_calibrations();
+
     /* Initialise wifi */
-    bs_wifi_init();
+    // bs_wifi_init();
 
     /* Initialise bluetooth */
-    bt_init();
+    // bt_init();
 
     /* Initialise adc */
     adc_init();
@@ -92,16 +126,47 @@ void app_main()
     /* Initialise timer */
     bs_timer_init();
 
+    printf("working mode :%s!!!\n", working_mode == WORKING_MODE_NORMAL? "normal":"calibration");
+
     while(1) {
         vTaskDelay(100/portTICK_RATE_MS);
-        // printf("%d\n", queue_average(&dataQueueBuffer[test_channel]));
-        for (int i = 0; i < 2; ++i)
-        {
-            // printf("%d: %d\n", i, queue_average(&dataQueueBuffer[i]));
-            int32_t weight = get_weight(queue_average(&dataQueueBuffer[i])/100, i);
-            // printf("%d\n", weight1);
-            // int32_t weight = get_weight(channel_values[0]/100);
-            setDisplayNumber(i, weight, 0);
+
+        /*
+        if (working_mode == WORKING_MODE_CALIBRATION) {
+            printf("0: %d\n", queue_average(&calibrationQueueBuffer[0]));
+            printf("1: %d\n", queue_average(&calibrationQueueBuffer[1]));
+        }else{
+            printf("0: %d\n", queue_average(&dataQueueBuffer[0]));
+            printf("1: %d\n", queue_average(&dataQueueBuffer[1]));
+        }
+        */
+
+        if (working_mode == WORKING_MODE_NORMAL) {
+            for (int i = 0; i < 2; ++i)
+            {
+                int8_t precision;
+                int32_t weight = get_weight(queue_average(&dataQueueBuffer[i]), i, &precision);
+                setDisplayNumber(i, weight, precision);
+            }
+        } else if (working_mode == WORKING_MODE_CALIBRATION && calibrate_tick >=0 ) {
+            calibrate_tick++;
+            // printf("tick: %d\n", calibrate_tick);
+            if (calibrate_tick >= 20) {
+                int32_t cal1 = queue_average(&calibrationQueueBuffer[0]);
+                int32_t cal2 = queue_average(&calibrationQueueBuffer[1]);
+                printf("%d: %d\n", cal1, cal2);
+                set_calibration(calibrate_index++, cal1, cal2);
+                beap(0, 200);
+                calibrate_tick = -1;
+                //exit calibration mode
+                if (calibrate_index >= CALIBRATION_NUMS) {
+                    printf("exist calibration mode\n");
+                    working_mode = WORKING_MODE_NORMAL;
+                    adc_calibration(false);
+                    calibrate_index = 0;
+                    beap(100,400);
+                }
+            }
         }
     }
 }
