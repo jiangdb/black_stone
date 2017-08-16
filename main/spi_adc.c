@@ -17,10 +17,14 @@
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 #include "queue_buffer.h"
+#include "util.h"
 
 /*
 */
 #define TAG                   "ADC"
+
+#define SINGLE_CHANNLE        0
+#define PRECISION             5
 
 #define PIN_NUM_DATA          23
 #define PIN_NUM_CLK           18
@@ -126,18 +130,29 @@ static int32_t config(int8_t config)
         ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
         assert(ret==ESP_OK);
         if ( x==0 ) {
-            /*
             if (rtrans->rx_data[0] & 0x80) {
-                value = 0xFF<<24|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
+                value = 0xFF000000|rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
             }else{
                 value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
             }
-            */
-            if (rtrans->rx_data[0] & 0x80) {
-                value = 0xFFFF<<16|rtrans->rx_data[0]<<8|rtrans->rx_data[1];
+            // if ((value & 1<<(PRECISION-1)) && (value & 1<<(PRECISION-2))) {
+            if (value & 1<<(PRECISION-1)) {
+                value = (value >> PRECISION) + 1;
             }else{
-                value = rtrans->rx_data[0]<<8|rtrans->rx_data[1];
+                value = value >> PRECISION;
             }
+            /*
+            if (!(config & CH_SEL_B)) {
+                printf("adc value: ");
+                print_bin(rtrans->rx_data[0]);
+                printf("    ");
+                print_bin(rtrans->rx_data[1]);
+                printf("    ");
+                print_bin(rtrans->rx_data[2]);
+                printf("\n");
+                printf("value: %08x\n", value);
+            }
+            */
             // printf("adc value: %d\n", value);
             // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
         }
@@ -155,18 +170,21 @@ static int32_t read_only()
     ret=spi_device_transmit(spi, &t);  //Transmit!
     assert(ret==ESP_OK);               //Should have had no issues.
     int32_t value=0;
-    /*
     if (t.rx_data[0] & 0x80) {
-        value = 0xFF<<24|t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
+        value = 0xFF000000|t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
     }else{
         value = t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
     }
+    value = value >> PRECISION;
+    /*
+    printf("adc value: ");
+    print_bin(t.rx_data[0]);
+    printf("    ");
+    print_bin(t.rx_data[1]);
+    printf("    ");
+    print_bin(t.rx_data[2]);
+    printf("\n");
     */
-    if (t.rx_data[0] & 0x80) {
-        value = 0xFFFF<<16|t.rx_data[0]<<8|t.rx_data[1];
-    }else{
-        value = t.rx_data[0]<<8|t.rx_data[1];
-    }
     return value;
 }
 
@@ -220,12 +238,22 @@ static void adc_loop()
     uint8_t conf = 0;
     uint8_t ch = 0;
     int32_t v = 0;
+    bool configed = false;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
 
+#if SINGLE_CHANNLE
+        if (!configed) {
+            conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
+            v = config(conf);
+            configed  = true;
+        }else{
+            v = read_only();
+        }
+#else
         if (ch == 0) {
             conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
             v = config(conf);
@@ -245,7 +273,7 @@ static void adc_loop()
             }
             ch = 0;
         }
-
+#endif
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable gpio again and wait for data
