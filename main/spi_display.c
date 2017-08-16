@@ -63,6 +63,8 @@ extern queue_buffer_t dataQueueBuffer[2];
 #define NUMBER_8                0x7F
 #define NUMBER_9                0x6F
 #define NUMBER_OFF              0x00
+#define OPT_DASH                0x40
+
 
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
@@ -113,8 +115,10 @@ void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
     int8_t data[DIGITAL_NUMBER];
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
+    if (value > 9999) { value = 9999; precision=0;}
+    if (value < -999) { value = -999; precision=0;}
 
-    if (value <= 0) {
+    if (value == 0) {
         //show 0.0
         int start = 1+DIGITAL_NUMBER*displayNum;
         display_data[start] = NUMBER_OFF;
@@ -126,18 +130,26 @@ void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
     }
 
     //convert to array, LSB mode
-    memset(data, -1, sizeof(data));
-    for(int i=DIGITAL_NUMBER-1; i>=0; i--) {
-        data[i] = value % 10;
-        value/=10;
-        if (value==0) break;
+    memset(data, -2, sizeof(data));
+    int32_t abs_value = value > 0 ? value: (0-value);
+    int i;
+    for(i=DIGITAL_NUMBER-1; i>=0; i--) {
+        data[i] = abs_value % 10;
+        abs_value/=10;
+        if (abs_value==0) break;
+    }
+
+    if (value < 0) {
+        data[i-1] = -1;
     }
 
     //set display data
     int start = 1+DIGITAL_NUMBER*displayNum;
     for (int j=0; j<DIGITAL_NUMBER; j++) {
-        if (data[j]==-1){
+        if (data[j] == -2){
             display_data[start+j] = NUMBER_OFF;
+        }else if (data[j] == -1){
+            display_data[start+j] = OPT_DASH;
         }else{
             display_data[start+j] = numbers[data[j]];
         }

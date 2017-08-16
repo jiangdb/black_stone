@@ -144,9 +144,10 @@ void app_main()
         if (working_mode == WORKING_MODE_NORMAL) {
             for (int i = 0; i < 2; ++i)
             {
-                int8_t precision;
+                int8_t precision = 0;
                 int32_t weight = get_weight(queue_average(&dataQueueBuffer[i]), i, &precision);
-                setDisplayNumber(i, weight, precision);
+                // printf("weight: %d\n", weight);
+                setDisplayNumber(i==0?1:0 , weight, precision);     //switch 0/1
             }
         } else if (working_mode == WORKING_MODE_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;

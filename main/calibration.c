@@ -6,7 +6,7 @@
 #include "config.h"
 
 
-#define CALIBRATION_WEIGHT      1900        //2000g-100g
+#define CALIBRATION_WEIGHT      900        //1000g-100g
 #define CONFIG_CHANNEL_0_ZERO   "channel_0_zero"
 #define CONFIG_CHANNEL_1_ZERO   "channel_1_zero"
 #define CONFIG_CHANNEL_0_CALIBRATION   "channel_0_cal"
@@ -118,10 +118,10 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
     if (cal[channel] == 0) return 0;
 
     float rtn = (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel];
-    if (rtn > 1000) {
+    if (rtn > 1000 || rtn < -100) {
         *precision = 0;
         return (int32_t)rtn;
-    }else{
+    } else{
         *precision = 1;
         return (int32_t)(rtn*10);
     }
