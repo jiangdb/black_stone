@@ -78,7 +78,7 @@ void handle_key_event(key_event_t keyEvent)
                     clear_hold++;
                     if (clear_hold >= 10) {
                         printf("enter calibration mode\n");
-                        beap(0, 200);
+                        beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
                         adc_calibration(true);
                     }
@@ -131,7 +131,6 @@ void app_main()
     while(1) {
         vTaskDelay(100/portTICK_RATE_MS);
 
-        /*
         if (working_mode == WORKING_MODE_CALIBRATION) {
             printf("0: %d\n", queue_average(&calibrationQueueBuffer[0]));
             printf("1: %d\n", queue_average(&calibrationQueueBuffer[1]));
@@ -139,7 +138,6 @@ void app_main()
             printf("0: %d\n", queue_average(&dataQueueBuffer[0]));
             printf("1: %d\n", queue_average(&dataQueueBuffer[1]));
         }
-        */
 
         if (working_mode == WORKING_MODE_NORMAL) {
             for (int i = 0; i < 2; ++i)
@@ -152,7 +150,7 @@ void app_main()
         } else if (working_mode == WORKING_MODE_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
             // printf("tick: %d\n", calibrate_tick);
-            if (calibrate_tick >= 20) {
+            if (calibrate_tick >= 30) {
                 int32_t cal1 = queue_average(&calibrationQueueBuffer[0]);
                 int32_t cal2 = queue_average(&calibrationQueueBuffer[1]);
                 printf("%d: %d\n", cal1, cal2);

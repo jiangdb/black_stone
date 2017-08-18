@@ -1,3 +1,6 @@
+#ifndef _DISPLAY_H_
+#define _DISPLAY_H_
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,3 +13,5 @@ void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int8_t percentage);
 void setWifiSound(bool wifi, bool sound);
 void spi_trassfer_display();
+
+#endif  /*_DISPLAY_H_*/

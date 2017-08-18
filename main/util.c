@@ -2,13 +2,20 @@
 #include "freertos/FreeRTOS.h"
 #include "util.h"
 
-void print_bin(int8_t value)
+void print_bin(int32_t value, int bytes)
 {
-    for (int i = 7; i >=0; i--)
+	if (bytes > 4 || bytes < 0) return;
+
+    for (int i = 8*bytes-1; i >=0; i--)
     {
         if(value & (1 << i))
             printf("1");
         else
             printf("0");
+
+        if ( ((i+1)%8 == 0) && ((i+1)/8<bytes) ){
+            printf("    ");        	
+        }
     }
+    printf("\n");
 }

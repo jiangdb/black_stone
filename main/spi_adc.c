@@ -24,7 +24,7 @@
 #define TAG                   "ADC"
 
 #define SINGLE_CHANNLE        0
-#define PRECISION             5
+#define PRECISION             4
 
 #define PIN_NUM_DATA          23
 #define PIN_NUM_CLK           18
@@ -135,32 +135,20 @@ static int32_t config(int8_t config)
             }else{
                 value = rtrans->rx_data[0]<<16|rtrans->rx_data[1]<<8|rtrans->rx_data[2];
             }
-            // if ((value & 1<<(PRECISION-1)) && (value & 1<<(PRECISION-2))) {
-            if (value & 1<<(PRECISION-1)) {
-                value = (value >> PRECISION) + 1;
-            }else{
-                value = value >> PRECISION;
-            }
             /*
             if (!(config & CH_SEL_B)) {
                 printf("adc value: ");
-                print_bin(rtrans->rx_data[0]);
-                printf("    ");
-                print_bin(rtrans->rx_data[1]);
-                printf("    ");
-                print_bin(rtrans->rx_data[2]);
-                printf("\n");
-                printf("value: %08x\n", value);
+                print_bin(value, 4);
             }
             */
+            value = value >> PRECISION;
             // printf("adc value: %d\n", value);
-            // printf("%d: 0x%02x%02x%02x%02x\n", oldChannel, rtrans->rx_data[0], rtrans->rx_data[1], rtrans->rx_data[2], rtrans->rx_data[3]);
         }
     }
     return value;
 }
 
-static int32_t read_only()
+static int32_t read_only(bool print)
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -175,17 +163,27 @@ static int32_t read_only()
     }else{
         value = t.rx_data[0]<<16|t.rx_data[1]<<8|t.rx_data[2];
     }
+    if (print) {
+        printf("adc value: ");
+        print_bin(value, 4);
+    }
     value = value >> PRECISION;
-    /*
-    printf("adc value: ");
-    print_bin(t.rx_data[0]);
-    printf("    ");
-    print_bin(t.rx_data[1]);
-    printf("    ");
-    print_bin(t.rx_data[2]);
-    printf("\n");
-    */
+    // printf("adc value: %d\n", value);
+
     return value;
+}
+
+static void push_to_buffer(int channel, int32_t value)
+{
+    queue_buffer_t *pBuffer;
+    if (calibration_enable) {
+        pBuffer = &calibrationQueueBuffer[channel];
+    }else{
+        pBuffer = &dataQueueBuffer[channel];
+    }
+    if (abs(value - queue_average(pBuffer)) >=2 ){
+        queue_buffer_push(pBuffer, value);
+    }
 }
 
 static void spi_init()
@@ -254,25 +252,35 @@ static void adc_loop()
             v = read_only();
         }
 #else
+/*
+        if (configed) {
+            configed = false;
+            if (ch == 0) {
+                v = read_only(true);
+            }else{
+                v = read_only(false);
+            }
+        }else{
+            if (ch == 0) {
+                conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
+                v = config(conf);
+                ch = 1;
+            }else{
+                conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
+                v = config(conf);
+                ch = 0;
+            }
+            configed = true;
+        }
+        */
         if (ch == 0) {
             conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
-            v = config(conf);
-            if (calibration_enable) {
-                queue_buffer_push(&calibrationQueueBuffer[ch], v);
-            }else{
-                queue_buffer_push(&dataQueueBuffer[ch], v);
-            }
-            ch = 1;
         }else{
             conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
-            v = config(conf);
-            if (calibration_enable) {
-                queue_buffer_push(&calibrationQueueBuffer[ch], v);
-            }else{
-                queue_buffer_push(&dataQueueBuffer[ch], v);
-            }
-            ch = 0;
         }
+        v = config(conf);
+        push_to_buffer(ch, v);
+        ch = ch == 0 ? 1:0;
 #endif
         vTaskDelay(10/portTICK_RATE_MS);
 
