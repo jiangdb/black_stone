@@ -15,6 +15,7 @@ typedef struct {
 
 bool queue_buffer_init(queue_buffer_t* pqueue, int32_t* pBuf, int32_t size);
 void queue_buffer_push(queue_buffer_t* pqueue, int32_t data);
+int32_t queue_last(queue_buffer_t* f);
 int32_t queue_average(queue_buffer_t* pqueue);
 void queue_dump(queue_buffer_t* pqueue);
 void queue_test();

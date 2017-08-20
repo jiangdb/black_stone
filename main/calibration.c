@@ -6,7 +6,7 @@
 #include "config.h"
 
 
-#define CALIBRATION_WEIGHT      100        //100g
+#define CALIBRATION_WEIGHT      500        //500g-1000g
 #define CONFIG_CHANNEL_0_ZERO   "channel_0_zero"
 #define CONFIG_CHANNEL_1_ZERO   "channel_1_zero"
 #define CONFIG_CHANNEL_0_CALIBRATION   "channel_0_cal"
@@ -81,8 +81,8 @@ void set_zero(int32_t adcValue0, int32_t adcValue1)
 
 void get_zero()
 {
-    zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 378);
-    zero[1] = config_read(CONFIG_CHANNEL_0_ZERO, 712);
+    zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 0);
+    zero[1] = config_read(CONFIG_CHANNEL_1_ZERO, 0);
     printf("get zero: %d, %d\n", zero[0], zero[1]);
 }
 
@@ -117,6 +117,11 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
 
     if (cal[channel] == 0) return 0;
 
+/*
+    if (channel == 1) {
+        printf("adc: %d ==> weight: %f\n", adcValue, (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel]);
+    }
+    */
     int32_t weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     if (weight >= 100000 || weight <= -10000) {
         *precision = 0;

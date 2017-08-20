@@ -25,11 +25,31 @@ void queue_buffer_push(queue_buffer_t* f, int32_t data)
     f->head=0;
     f->full=true;
   }
+  // printf("push:");
+  // queue_dump(f);
 }
+
+int32_t queue_last(queue_buffer_t* f)
+{
+  CHECK_NULL(f)
+
+  if (f->head == 0) {
+    if (f->full) {
+      return f->pData[f->size-1];
+    }else
+      return 0;
+  }else{
+    return f->pData[f->head-1];
+  }
+}
+
 
 int32_t queue_average(queue_buffer_t* f)
 {
   CHECK_NULL(f)
+
+  // printf("avg:");
+  // queue_dump(f);
 
   int32_t end = f->head;
   if (f->full) {
@@ -50,7 +70,7 @@ void queue_dump(queue_buffer_t* f)
 {
   CHECK_NULL(f)
 
-  uint32_t end = f->head;
+  int32_t end = f->head;
   if (f->full) {
     end = f->size;
   }
@@ -60,11 +80,12 @@ void queue_dump(queue_buffer_t* f)
     return;
   }
 
-  printf("queue size: %d !\n", end);
+  printf("queue(%d):", end);
 
   for ( int i=0; i<end; i++ ) {
-    printf("%d: %d!\n", i, f->pData[i]);
+    printf("    %d", f->pData[i]);
   }
+  printf("\n");
 }
 
 void queue_test()

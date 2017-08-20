@@ -13,8 +13,8 @@ void print_bin(int32_t value, int bytes)
         else
             printf("0");
 
-        if ( ((i+1)%8 == 0) && ((i+1)/8<bytes) ){
-            printf("    ");        	
+        if (i%8 == 0){
+            printf("    ");
         }
     }
     printf("\n");
