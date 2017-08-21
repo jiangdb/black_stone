@@ -131,11 +131,13 @@ void app_main()
     while(1) {
         vTaskDelay(100/portTICK_RATE_MS);
 
+/*
         if (working_mode == WORKING_MODE_CALIBRATION) {
             printf("0: %d ---- 1: %d\n", queue_average(&calibrationQueueBuffer[0]), queue_average(&calibrationQueueBuffer[1]));
         }else{
             printf("0: %d ---- 1: %d\n", queue_average(&dataQueueBuffer[0]), queue_average(&dataQueueBuffer[1]));
         }
+        */
 
         if (working_mode == WORKING_MODE_NORMAL) {
             for (int i = 0; i < 2; ++i)
