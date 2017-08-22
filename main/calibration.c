@@ -104,20 +104,8 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
 {
 
     if (channel<0||channel>CALIBRATION_NUMS) return 0;
-
-    // int value = (adcValue/100)*100-zero[channel];
-
-    /*
-    if (channel == 0) {
-        return (value*2900/(calibrations[channel][1]-calibrations[channel][0]));
-    }else{
-        return (value*2900/(calibrations[channel][1]-calibrations[channel][0]));
-    }
-    */
-
     if (cal[channel] == 0) return 0;
-
-/*
+    /*
     if (channel == 1) {
         printf("adc: %d ==> weight: %f\n", adcValue, (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel]);
     }
@@ -125,14 +113,11 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
     int32_t weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     if (weight >= 100000 || weight <= -10000) {
         *precision = 0;
-        return (weight+50)/100;
+        return (weight+50)/10;
     } else{
         *precision = 1;
         return (weight+5)/10;
     }
-    // return ((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/(cal[channel]);
-    // return (( (adcValue/100) * 100 - zero[channel]) * CALIBRATION_WEIGHT )/(cal[channel]);
-    // return CONVERT_WEIGHT(value);
     /*
     int i;
     //find range

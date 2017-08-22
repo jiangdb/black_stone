@@ -118,6 +118,7 @@ static int32_t parse_adc(int channel, uint8_t data[4])
         printf("adc value[%d]: (int)%d  ", channel, value >> PRECISION );
         print_bin(value, 3);
     }
+
     /*
     //check if we need -1
     bool need_minus = false;
@@ -139,7 +140,6 @@ static int32_t parse_adc(int channel, uint8_t data[4])
     }
     */
     value = value >> PRECISION;
-
     return value;
 }
 
@@ -170,7 +170,7 @@ static int32_t config(int8_t config)
         ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
         assert(ret==ESP_OK);
         if ( x==0 ) {
-            value = parse_adc(config&CH_SEL_B?1:0, rtrans->rx_data);
+            value = parse_adc(config&CH_SEL_B?0:1, rtrans->rx_data);
         }
     }
     return value;
@@ -204,12 +204,6 @@ static void push_to_buffer(int channel, int32_t value)
     }else{
         queue_buffer_push(pBuffer, last);
     }
-
-/*
-    if (channel == 1) {
-        printf("adc value[%d]: (int)%d ", channel, value);
-    }
-    */
 }
 
 static void spi_init()
