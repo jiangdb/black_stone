@@ -83,12 +83,9 @@ void handle_key_event(key_event_t keyEvent)
                 break;
             case CLEAR_KEY:
                 if (keyEvent.key_value == KEY_DOWN) {
-                    int32_t weight1 = queue_average(&dataQueueBuffer[0]);
-                    int32_t weight2 = queue_average(&dataQueueBuffer[1]);
-                    printf("%d: %d\n", weight1, weight2);
-                    set_zero(weight1,weight2);
                     for (int i = 0; i < 2; ++i)
                     {
+                        set_zero(i,queue_average(&dataQueueBuffer[i]));
                         setDisplayNumber(i, 0, 0);
                         lock_display(i, false);
                     }
@@ -175,10 +172,15 @@ void app_main()
                         last_weight[i] = weight;
                     }else{
                         display_lock_count[i]++;
+                        //1s not change, and weight < 0.5g, clear zero
+                        if ( (abs(weight) < 5) && (display_lock_count[i] == 10)) {
+                            set_zero(i, weight);
+                        }
                         //3s not change, lock display
                         if (display_lock_count[i] == 30) {
                             lock_display(i, true);                            
                         }
+
                     }
                 }
                 if (!display_lock[i]) {

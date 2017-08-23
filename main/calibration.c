@@ -58,10 +58,15 @@ char* calibration_name[2][5] = {
     },
 };
 
+char* config_zero_name[2] = {
+    CONFIG_CHANNEL_0_ZERO,
+    CONFIG_CHANNEL_1_ZERO
+};
+
 static int32_t zero[2] = {0,0};
 static int32_t cal[2] = {1,1};
 
-void set_zero(int32_t adcValue0, int32_t adcValue1)
+void set_zero(int channel, int32_t adcValue)
 {
     /*
     zero[0] = calibrations[0][0]-adcValue0;
@@ -71,12 +76,12 @@ void set_zero(int32_t adcValue0, int32_t adcValue1)
     zero[0] = (adcValue0/100)*100;
     zero[1] = (adcValue1/100)*100;
     */
-    zero[0] = adcValue0;
-    zero[1] = adcValue1;
+    if(channel<0||channel>1) return;
 
-    config_write(CONFIG_CHANNEL_0_ZERO, zero[0]);
-    config_write(CONFIG_CHANNEL_1_ZERO, zero[1]);
-    printf("set sezo: %d, %d\n", zero[0], zero[1]);
+    zero[channel] = adcValue;
+
+    config_write(config_zero_name[channel], zero[channel]);
+    printf("set zero[%d]: %d\n", channel, zero[channel]);
 }
 
 void get_zero()
