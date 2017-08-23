@@ -174,7 +174,7 @@ void app_main()
                     }else{
                         display_lock_count[i]++;
                         //1s not change, and weight < 0.5g, clear zero
-                        if ( (abs(weight) < 5) && (display_lock_count[i] == 10)) {
+                        if ( (abs(weight) < 10) && (display_lock_count[i] == 10)) {
                             set_zero(i, adcValue);
                         }
                         //3s not change, lock display
