@@ -180,7 +180,6 @@ void app_main()
                         if (display_lock_count[i] == 30) {
                             lock_display(i, true);                            
                         }
-
                     }
                 }
                 if (!display_lock[i]) {
