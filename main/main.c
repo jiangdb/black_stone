@@ -159,7 +159,8 @@ void app_main()
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
-                int32_t weight = get_weight(queue_average(&dataQueueBuffer[i]), i, &precision);
+                int32_t adcValue = queue_average(&dataQueueBuffer[i]);
+                int32_t weight = get_weight(adcValue, i, &precision);
 
                 // change more than 1.5g, unlock display
                 if (display_lock[i] && (abs(last_weight[i]-weight) > DISPLAY_LOCK_THRESHOLD)) {
@@ -174,7 +175,7 @@ void app_main()
                         display_lock_count[i]++;
                         //1s not change, and weight < 0.5g, clear zero
                         if ( (abs(weight) < 5) && (display_lock_count[i] == 10)) {
-                            set_zero(i, weight);
+                            set_zero(i, adcValue);
                         }
                         //3s not change, lock display
                         if (display_lock_count[i] == 30) {
