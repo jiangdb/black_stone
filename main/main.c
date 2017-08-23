@@ -87,7 +87,7 @@ void handle_key_event(key_event_t keyEvent)
                     {
                         set_zero(i,queue_average(&dataQueueBuffer[i]));
                         setDisplayNumber(i, 0, 0);
-                        lock_display(i, false);
+                        // lock_display(i, false);
                     }
                     clear_hold = 0;
                 } else if (keyEvent.key_value == KEY_HOLD) {

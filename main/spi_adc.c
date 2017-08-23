@@ -114,7 +114,7 @@ static int32_t parse_adc(int channel, uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    if (channel == 1) {
+    if (channel == 0) {
         printf("adc value[%d]: (int)%d  ", channel, value >> PRECISION );
         print_bin(value, 3);
     }
