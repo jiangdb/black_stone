@@ -275,12 +275,12 @@ static void adc_loop()
 #else
         v = config(channel_configs[ch]);
         push_to_buffer(ch, v);
-        ch = ch == 0 ? 1:0;
+        ch = (ch == 0 ? 1:0);
 #endif
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable gpio again and wait for data
-        gpio_spi_switch(DATA_PIN_FUNC_GPIO); 
+        gpio_spi_switch(DATA_PIN_FUNC_GPIO);
     }
 }
 
