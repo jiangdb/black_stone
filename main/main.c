@@ -19,6 +19,8 @@
 #define GPIO_LED_IO         19
 #define WORKING_MODE_NORMAL         0
 #define WORKING_MODE_CALIBRATION    1
+#define DISPLAY_LOCK_THRESHOLD      15      //1.5g
+
 
 extern void display_init();
 extern void adc_init();
@@ -37,8 +39,20 @@ static int working_mode = WORKING_MODE_NORMAL;
 static int calibrate_tick = -1;
 static int calibrate_index = 0;
 static int clear_hold = 0;
+static bool display_lock[2] = {false, false};
+static int display_lock_count[2] = {0,0};
+static int32_t last_weight[2] = {0,0};
 
-void led_on()
+static void lock_display(int channel, bool lock)
+{
+    display_lock[channel] = lock;
+    if (!lock) {
+        display_lock_count[channel] = 0;
+    }
+    printf("lock_display[%d]: %d!!!\n", channel, lock);
+}
+
+static void led_on()
 {
     printf("%s: led gpio_init !!!\n", TAG);
     //GPIO config for the data line.
@@ -69,16 +83,18 @@ void handle_key_event(key_event_t keyEvent)
                 break;
             case CLEAR_KEY:
                 if (keyEvent.key_value == KEY_DOWN) {
-                    int32_t weight1 = queue_average(&dataQueueBuffer[0]);
-                    int32_t weight2 = queue_average(&dataQueueBuffer[1]);
-                    printf("%d: %d\n", weight1, weight2);
-                    set_zero(weight1,weight2);
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        set_zero(i,queue_average(&dataQueueBuffer[i]));
+                        setDisplayNumber(i, 0, 0);
+                        // lock_display(i, false);
+                    }
                     clear_hold = 0;
                 } else if (keyEvent.key_value == KEY_HOLD) {
                     clear_hold++;
                     if (clear_hold >= 10) {
                         printf("enter calibration mode\n");
-                        beap(0, 200);
+                        beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
                         adc_calibration(true);
                     }
@@ -131,13 +147,11 @@ void app_main()
     while(1) {
         vTaskDelay(100/portTICK_RATE_MS);
 
-        /*
+/*
         if (working_mode == WORKING_MODE_CALIBRATION) {
-            printf("0: %d\n", queue_average(&calibrationQueueBuffer[0]));
-            printf("1: %d\n", queue_average(&calibrationQueueBuffer[1]));
+            printf("0: %d ---- 1: %d\n", queue_average(&calibrationQueueBuffer[0]), queue_average(&calibrationQueueBuffer[1]));
         }else{
-            printf("0: %d\n", queue_average(&dataQueueBuffer[0]));
-            printf("1: %d\n", queue_average(&dataQueueBuffer[1]));
+            printf("0: %d ---- 1: %d\n", queue_average(&dataQueueBuffer[0]), queue_average(&dataQueueBuffer[1]));
         }
         */
 
@@ -145,14 +159,39 @@ void app_main()
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
-                int32_t weight = get_weight(queue_average(&dataQueueBuffer[i]), i, &precision);
-                // printf("weight: %d\n", weight);
-                setDisplayNumber(i==0?1:0 , weight, precision);     //switch 0/1
+                int32_t adcValue = queue_average(&dataQueueBuffer[i]);
+                int32_t weight = get_weight(adcValue, i, &precision);
+
+                // change more than 1.5g, unlock display
+                if (display_lock[i] && (abs(last_weight[i]-weight) > DISPLAY_LOCK_THRESHOLD)) {
+                    lock_display(i, false);
+                    last_weight[i] = weight;
+                }else if (!display_lock[i]) {
+                    // change more than 0.5g, clear count
+                    if (abs(last_weight[i]-weight) > 5){
+                        display_lock_count[i] = 0;
+                        last_weight[i] = weight;
+                    }else{
+                        display_lock_count[i]++;
+                        //1s not change, and weight < 0.5g, clear zero
+                        if ( (abs(weight) < 10) && (display_lock_count[i] == 10)) {
+                            set_zero(i, adcValue);
+                        }
+                        //3s not change, lock display
+                        if (display_lock_count[i] == 30) {
+                            lock_display(i, true);                            
+                        }
+                    }
+                }
+                if (!display_lock[i]) {
+                    if (weight >10000 || weight<-1000) weight/=10;
+                    setDisplayNumber(i==0?1:0 , weight, precision);
+                }
             }
         } else if (working_mode == WORKING_MODE_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
             // printf("tick: %d\n", calibrate_tick);
-            if (calibrate_tick >= 20) {
+            if (calibrate_tick >= 30) {
                 int32_t cal1 = queue_average(&calibrationQueueBuffer[0]);
                 int32_t cal2 = queue_average(&calibrationQueueBuffer[1]);
                 printf("%d: %d\n", cal1, cal2);

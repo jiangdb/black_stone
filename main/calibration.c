@@ -6,7 +6,7 @@
 #include "config.h"
 
 
-#define CALIBRATION_WEIGHT      900        //1000g-100g
+#define CALIBRATION_WEIGHT      500        //500g-1000g
 #define CONFIG_CHANNEL_0_ZERO   "channel_0_zero"
 #define CONFIG_CHANNEL_1_ZERO   "channel_1_zero"
 #define CONFIG_CHANNEL_0_CALIBRATION   "channel_0_cal"
@@ -58,10 +58,15 @@ char* calibration_name[2][5] = {
     },
 };
 
+char* config_zero_name[2] = {
+    CONFIG_CHANNEL_0_ZERO,
+    CONFIG_CHANNEL_1_ZERO
+};
+
 static int32_t zero[2] = {0,0};
 static int32_t cal[2] = {1,1};
 
-void set_zero(int32_t adcValue0, int32_t adcValue1)
+void set_zero(int channel, int32_t adcValue)
 {
     /*
     zero[0] = calibrations[0][0]-adcValue0;
@@ -71,18 +76,18 @@ void set_zero(int32_t adcValue0, int32_t adcValue1)
     zero[0] = (adcValue0/100)*100;
     zero[1] = (adcValue1/100)*100;
     */
-    zero[0] = adcValue0;
-    zero[1] = adcValue1;
+    if(channel<0||channel>1) return;
 
-    config_write(CONFIG_CHANNEL_0_ZERO, zero[0]);
-    config_write(CONFIG_CHANNEL_1_ZERO, zero[1]);
-    printf("set sezo: %d, %d\n", zero[0], zero[1]);
+    zero[channel] = adcValue;
+
+    config_write(config_zero_name[channel], zero[channel]);
+    printf("set zero[%d]: %d\n", channel, zero[channel]);
 }
 
 void get_zero()
 {
-    zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 378);
-    zero[1] = config_read(CONFIG_CHANNEL_0_ZERO, 712);
+    zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 0);
+    zero[1] = config_read(CONFIG_CHANNEL_1_ZERO, 0);
     printf("get zero: %d, %d\n", zero[0], zero[1]);
 }
 
@@ -104,30 +109,20 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
 {
 
     if (channel<0||channel>CALIBRATION_NUMS) return 0;
-
-    // int value = (adcValue/100)*100-zero[channel];
-
+    if (cal[channel] == 0) return 0;
     /*
-    if (channel == 0) {
-        return (value*2900/(calibrations[channel][1]-calibrations[channel][0]));
-    }else{
-        return (value*2900/(calibrations[channel][1]-calibrations[channel][0]));
+    if (channel == 1) {
+        printf("adc: %d ==> weight: %f\n", adcValue, (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel]);
     }
     */
-
-    if (cal[channel] == 0) return 0;
-
-    float rtn = (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel];
-    if (rtn > 1000 || rtn < -100) {
+    int32_t weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
+    if (weight >= 100000 || weight <= -10000) {
         *precision = 0;
-        return (int32_t)rtn;
+        return (weight+50)/10;
     } else{
         *precision = 1;
-        return (int32_t)(rtn*10);
+        return (weight+5)/10;
     }
-    // return ((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/(cal[channel]);
-    // return (( (adcValue/100) * 100 - zero[channel]) * CALIBRATION_WEIGHT )/(cal[channel]);
-    // return CONVERT_WEIGHT(value);
     /*
     int i;
     //find range
@@ -154,6 +149,7 @@ void set_calibration(int index, int32_t channel0, int32_t channel1)
     calibrations[0][index] = channel0;
     calibrations[1][index] = channel1;
 
+    printf("set cal[%d]: %d, %d\n", index, channel0, channel1);
     if (index == 1) {
         // cal[0] = (calibrations[0][1]-calibrations[0][0])*100/100;
         // cal[1] = (calibrations[1][1]-calibrations[1][0])*100/100;
@@ -161,9 +157,9 @@ void set_calibration(int index, int32_t channel0, int32_t channel1)
         cal[1] = (calibrations[1][1]-calibrations[1][0]);
         config_write(CONFIG_CHANNEL_0_CALIBRATION, cal[0]);
         config_write(CONFIG_CHANNEL_1_CALIBRATION, cal[1]);
+        printf("calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][0]);
         printf("write cal config: %d, %d\n", cal[0], cal[1]);
     }
-    printf("set cal[%d]: %d, %d\n", index, channel0, channel1);
 }
 
 /*

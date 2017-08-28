@@ -129,6 +129,17 @@ void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
         return;
     }
 
+    if (value < 10 && value > -10 && precision > 0) {
+        //show 0.*
+        int start = 1+DIGITAL_NUMBER*displayNum;
+        display_data[start] = NUMBER_OFF;
+        display_data[start+1] = (value < 0) ? OPT_DASH:NUMBER_OFF;
+        display_data[start+2] = NUMBER_0;
+        display_data[start+2] |= 0x80;
+        display_data[start+3] = numbers[abs(value)];
+        return;
+    }
+
     //convert to array, LSB mode
     memset(data, -2, sizeof(data));
     int32_t abs_value = value > 0 ? value: (0-value);
