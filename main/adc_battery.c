@@ -15,7 +15,7 @@ void battery_task(void* arg)
 {
     // initialize ADC
     adc1_config_width(ADC_WIDTH_12Bit);
-    adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_6db);
+    adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_11db);
     while(1){
         printf("The adc1 value:%d\n",adc1_get_voltage(ADC1_CHANNEL));
         vTaskDelay(1000/portTICK_PERIOD_MS);
