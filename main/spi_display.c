@@ -99,7 +99,7 @@ static uint8_t numbers[] = {
     NUMBER_9,
 };
 
-static uint8_t percentages[] = {
+static uint8_t battery_levels[] = {
     0x0F,       //0
     0x1F,       //25
     0x3F,       //50
@@ -190,16 +190,23 @@ void setDisplayTime(uint32_t seconds)
     }
 }
 
-void setBatteryLevel(int8_t percentage)
+void setBatteryLevel(int batteryLevel)
 {
-    if (percentage < 25) {
-        display_data[BATTERY_ADDRESS] = percentages[0];
-    }else if(percentage < 50){
-        display_data[BATTERY_ADDRESS] = percentages[1];
-    }else if(percentage < 75){
-        display_data[BATTERY_ADDRESS] = percentages[2];
-    }else{
-        display_data[BATTERY_ADDRESS] = percentages[3];
+    switch(batteryLevel) {
+        case BATTERY_LEVEL_EMPTY:
+            display_data[BATTERY_ADDRESS] = battery_levels[0];
+            break;
+        case BATTERY_LEVEL_1:
+            display_data[BATTERY_ADDRESS] = battery_levels[1];
+            break;
+        case BATTERY_LEVEL_2:
+            display_data[BATTERY_ADDRESS] = battery_levels[2];
+            break;
+        case BATTERY_LEVEL_3:
+            display_data[BATTERY_ADDRESS] = battery_levels[3];
+            break;
+        default:
+            break;
     }
 }
 
