@@ -100,10 +100,10 @@ static uint8_t numbers[] = {
 };
 
 static uint8_t battery_levels[] = {
-    0x0F,       //0
-    0x1F,       //25
-    0x3F,       //50
-    0x7F,       //75
+    0x0F,       //empty
+    0x1F,       //1
+    0x3F,       //2
+    0x7F,       //3
 };
 
 static spi_device_handle_t spi;
