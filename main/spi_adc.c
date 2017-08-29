@@ -178,6 +178,7 @@ static int32_t config(int8_t config)
     return value;
 }
 
+#if SINGLE_CHANNLE    
 static int32_t read_only()
 {
     esp_err_t ret;
@@ -189,6 +190,7 @@ static int32_t read_only()
     assert(ret==ESP_OK);               //Should have had no issues.
     return parse_adc(1,t.rx_data);
 }
+#endif
 
 static void push_to_buffer(int channel, int32_t value)
 {
@@ -255,10 +257,12 @@ static void adc_gpio_init()
 
 static void adc_loop()
 {
-    uint8_t conf = 0;
     uint8_t ch = 0;
     int32_t v = 0;
+#if SINGLE_CHANNLE    
     bool configed = false;
+    uint8_t conf = 0;
+#endif
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );

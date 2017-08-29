@@ -27,6 +27,7 @@ extern void adc_init();
 extern void bt_init();
 extern void gpio_key_init();
 extern void bs_wifi_init();
+extern void battery_init();
 extern void beap(int wait, int duration);
 extern void set_calibration(int index, int32_t channel0, int32_t channel1);
 extern void adc_calibration(bool enable);
@@ -124,6 +125,7 @@ void app_main()
     get_zero();
     get_calibrations();
 
+    battery_init();
     /* Initialise wifi */
     // bs_wifi_init();
 
