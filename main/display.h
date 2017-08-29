@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
+void display_init();
 void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int8_t percentage);

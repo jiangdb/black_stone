@@ -21,8 +21,6 @@
 
 /*
 */
-extern queue_buffer_t dataQueueBuffer[2];
-
 #define PIN_NUM_MISO 13
 #define PIN_NUM_MOSI 12
 #define PIN_NUM_CLK  14

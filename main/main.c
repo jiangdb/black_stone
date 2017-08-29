@@ -16,13 +16,11 @@
 #include "calibration.h"
 #include "config.h"
 
-#define GPIO_LED_IO         19
+#define GPIO_LED_IO                 19
 #define WORKING_MODE_NORMAL         0
 #define WORKING_MODE_CALIBRATION    1
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
 
-
-extern void display_init();
 extern void adc_init();
 extern void bt_init();
 extern void gpio_key_init();
@@ -33,7 +31,6 @@ extern void set_calibration(int index, int32_t channel0, int32_t channel1);
 extern void adc_calibration(bool enable);
 extern queue_buffer_t dataQueueBuffer[2];
 extern queue_buffer_t calibrationQueueBuffer[2];
-
 
 static const char *TAG = "black_stone";
 static int working_mode = WORKING_MODE_NORMAL;
