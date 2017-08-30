@@ -12,11 +12,11 @@
 
 #define ADC1_CHANNEL (6)
 #define ADC1_REF     3650
-#define BATTERY_PERCENTAGE_75		2190
-#define BATTERY_PERCENTAGE_50		2120
-#define BATTERY_PERCENTAGE_25		2060
-#define BATTERY_PERCENTAGE_0 		2000
-#define BATTERY_WARNING				1975
+#define BATTERY_PERCENTAGE_75		3900
+#define BATTERY_PERCENTAGE_50		3800
+#define BATTERY_PERCENTAGE_25		3700
+#define BATTERY_PERCENTAGE_0 		3500
+#define BATTERY_WARNING				3500
 
 void battery_task(void* arg)
 {
@@ -42,7 +42,7 @@ void battery_task(void* arg)
         }else if (adcValue > BATTERY_PERCENTAGE_0) {
         	setBatteryLevel(BATTERY_LEVEL_EMPTY);
         }
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(30000/portTICK_PERIOD_MS);
     }
 }
 
