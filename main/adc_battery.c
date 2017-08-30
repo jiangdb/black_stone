@@ -33,13 +33,13 @@ void battery_task(void* arg)
         printf("The adc1 value:%d\n",adcValue);
         printf("battery voltage:%d\n",voltage);
 
-        if (voltage > BATTERY_PERCENTAGE_75) {
+        if (voltage >= BATTERY_PERCENTAGE_75) {
         	setBatteryLevel(BATTERY_LEVEL_3);
-        }else if (voltage > BATTERY_PERCENTAGE_50) {
+        }else if (voltage >= BATTERY_PERCENTAGE_50) {
         	setBatteryLevel(BATTERY_LEVEL_2);
-        }else if (voltage > BATTERY_PERCENTAGE_25) {
+        }else if (voltage >= BATTERY_PERCENTAGE_25) {
         	setBatteryLevel(BATTERY_LEVEL_1);
-        }else if (voltage > BATTERY_PERCENTAGE_0) {
+        }else if (voltage >= BATTERY_PERCENTAGE_0) {
         	setBatteryLevel(BATTERY_LEVEL_EMPTY);
         }
         vTaskDelay(30000/portTICK_PERIOD_MS);
