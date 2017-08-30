@@ -11,6 +11,7 @@
 #include "display.h"
 
 #define ADC1_CHANNEL (6)
+#define ADC1_REF     3650
 #define BATTERY_PERCENTAGE_75		2190
 #define BATTERY_PERCENTAGE_50		2120
 #define BATTERY_PERCENTAGE_25		2060
@@ -22,11 +23,15 @@ void battery_task(void* arg)
     // initialize ADC
     adc1_config_width(ADC_WIDTH_9Bit);
     adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_11db);
-    int adcValue=0;
+    int adcValue = 0;
+    int voltage = 0;
     while(1){
     	adcValue = adc1_get_voltage(ADC1_CHANNEL);
+        voltage = (adcValue*ADC1_REF*2)/512;
+        voltage = (voltage+50)/100*100;
+
         printf("The adc1 value:%d\n",adcValue);
-        printf("battery voltage:%d\n",(adcValue*3650*2)/512);
+        printf("battery voltage:%d\n",voltage);
 
         if (adcValue > BATTERY_PERCENTAGE_75) {
         	setBatteryLevel(BATTERY_LEVEL_3);
