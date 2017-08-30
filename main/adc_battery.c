@@ -20,13 +20,13 @@
 void battery_task(void* arg)
 {
     // initialize ADC
-    adc1_config_width(ADC_WIDTH_12Bit);
-    adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_11db);
+    adc1_config_width(ADC_WIDTH_9Bit);
+    adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_6db);
     int adcValue=0;
     while(1){
     	adcValue = adc1_get_voltage(ADC1_CHANNEL);
         printf("The adc1 value:%d\n",adcValue);
-        printf("battery voltage:%d\n",(adcValue*3300)/4095);
+        printf("battery voltage:%d\n",(adcValue*2200*2)/512);
 
         if (adcValue > BATTERY_PERCENTAGE_75) {
         	setBatteryLevel(BATTERY_LEVEL_3);
