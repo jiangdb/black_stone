@@ -107,6 +107,7 @@ static uint8_t battery_levels[] = {
 };
 
 static spi_device_handle_t spi;
+static TaskHandle_t xHandle = NULL;
 
 void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
 {
@@ -282,18 +283,18 @@ void spi_trassfer_display()
 
 }
 
-void display_numbers()
+void display_shutdown()
 {
-    uint8_t numbers[] = {
-        NUMBER_0, NUMBER_1, NUMBER_2, NUMBER_3, NUMBER_4, NUMBER_5,
-        NUMBER_6, NUMBER_7, NUMBER_8, NUMBER_9
-    };
-    spi_trassfer_single_byte(COMMAND_DATA_MODE_ADDRESS_FIX);
-    for (int i=0; i< 8; i++ ) {
-        uint8_t address = COMMAND_ADDRESS_0 + i;
-        spi_trassfer_2bytes(address, numbers[i]);
+    if( xHandle != NULL )
+    {
+        vTaskDelete( xHandle );
     }
-    spi_trassfer_single_byte(COMMAND_DISPLAY_ON);
+
+    for (int i = 1; i < sizeof(display_data); ++i)
+    {
+        display_data[i] = 0;
+    }
+    spi_trassfer_display();
 }
 
 void display_loop()
@@ -332,5 +333,5 @@ void display_init()
     assert(ret==ESP_OK);
 
     //Create task
-    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, NULL);
+    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
 }

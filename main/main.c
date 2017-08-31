@@ -14,6 +14,7 @@
 #include "queue_buffer.h"
 #include "key_event.h"
 #include "calibration.h"
+#include "spi_adc.h"
 #include "config.h"
 
 #define GPIO_LED_IO                 19
@@ -21,14 +22,12 @@
 #define WORKING_MODE_CALIBRATION    1
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
 
-extern void adc_init();
 extern void bt_init();
 extern void gpio_key_init();
 extern void bs_wifi_init();
-extern void battery_init();
+extern bool battery_init();
 extern void beap(int wait, int duration);
 extern void set_calibration(int index, int32_t channel0, int32_t channel1);
-extern void adc_calibration(bool enable);
 extern queue_buffer_t dataQueueBuffer[2];
 extern queue_buffer_t calibrationQueueBuffer[2];
 
@@ -40,6 +39,7 @@ static int clear_hold = 0;
 static bool display_lock[2] = {false, false};
 static int display_lock_count[2] = {0,0};
 static int32_t last_weight[2] = {0,0};
+static bool done = false;
 
 static void lock_display(int channel, bool lock)
 {
@@ -67,6 +67,36 @@ static void led_on()
     gpio_set_level(GPIO_LED_IO, 1);
 }
 
+static void do_sleep()
+{
+    const int ext_wakeup_pin_1 = 33;
+    const uint64_t ext_wakeup_pin_1_mask = 1ULL << ext_wakeup_pin_1;
+
+    //enable gpio wakeup
+    esp_deep_sleep_enable_ext1_wakeup(ext_wakeup_pin_1_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    printf("enter sleep now\n");
+    esp_deep_sleep_start();
+}
+
+static void enter_sleep()
+{
+    printf("enter sleep\n");
+
+    done = true;
+    vTaskDelay(100/portTICK_RATE_MS);       //wait main loop to exist
+
+
+    //turn off display
+    display_shutdown();
+
+    //turn off adc
+    adc_shutdown();
+
+    //do sleep
+    do_sleep();
+}
+
 void handle_key_event(key_event_t keyEvent)
 {
     if (working_mode == WORKING_MODE_NORMAL) {
@@ -81,6 +111,7 @@ void handle_key_event(key_event_t keyEvent)
                 break;
             case CLEAR_KEY:
                 if (keyEvent.key_value == KEY_DOWN) {
+                    /*
                     for (int i = 0; i < 2; ++i)
                     {
                         set_zero(i,queue_average(&dataQueueBuffer[i]));
@@ -88,7 +119,10 @@ void handle_key_event(key_event_t keyEvent)
                         // lock_display(i, false);
                     }
                     clear_hold = 0;
+                    */
+                    enter_sleep();
                 } else if (keyEvent.key_value == KEY_HOLD) {
+                    /*
                     clear_hold++;
                     if (clear_hold >= 10) {
                         printf("enter calibration mode\n");
@@ -96,7 +130,11 @@ void handle_key_event(key_event_t keyEvent)
                         working_mode = WORKING_MODE_CALIBRATION;
                         adc_calibration(true);
                     }
+                    */
                 }
+                break;
+            case SLEEP_KEY:
+                enter_sleep();
                 break;
             default:
                 break;
@@ -114,6 +152,11 @@ void app_main()
     printf("BLACK STONE!!!\n");
 	ESP_LOGI(TAG, "Start!!!");
 
+    //init battery first
+    if (!battery_init()) {
+        do_sleep();
+    }
+
     /* led */
     led_on();
 
@@ -122,7 +165,6 @@ void app_main()
     get_zero();
     get_calibrations();
 
-    battery_init();
     /* Initialise wifi */
     // bs_wifi_init();
 
@@ -143,10 +185,10 @@ void app_main()
 
     printf("working mode :%s!!!\n", working_mode == WORKING_MODE_NORMAL? "normal":"calibration");
 
-    while(1) {
+    while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
 
-/*
+        /*
         if (working_mode == WORKING_MODE_CALIBRATION) {
             printf("0: %d ---- 1: %d\n", queue_average(&calibrationQueueBuffer[0]), queue_average(&calibrationQueueBuffer[1]));
         }else{
@@ -208,4 +250,5 @@ void app_main()
             }
         }
     }
+    printf("quit main loop\n");
 }

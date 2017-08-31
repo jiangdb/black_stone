@@ -19,5 +19,6 @@ void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(bool wifi, bool sound);
 void spi_trassfer_display();
-
+void display_init();
+void display_shutdown();
 #endif  /*_DISPLAY_H_*/

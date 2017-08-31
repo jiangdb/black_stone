@@ -3,6 +3,8 @@
 /* KEY TYPE */
 #define TIMER_KEY	1
 #define CLEAR_KEY   2
+#define SLEEP_KEY   3
+
 
 /* KEY VALUE */
 #define KEY_UP		0

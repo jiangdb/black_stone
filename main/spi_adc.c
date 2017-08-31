@@ -64,6 +64,7 @@ static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
 static int32_t pre_value[2]={0,0};
+static TaskHandle_t xHandle = NULL;
 queue_buffer_t dataQueueBuffer[2];
 int32_t dataBuffer[2][BUFFER_SIZE];
 
@@ -313,10 +314,33 @@ void adc_init()
     queue_buffer_init(&calibrationQueueBuffer[1], calibrationBuffer[1], CALIBRATION_BUFFER_SIZE);
 
     //Create task
-    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, NULL);
+    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
 }
 
 void adc_calibration(bool enable)
 {
     calibration_enable = enable;
+}
+
+void adc_shutdown()
+{
+    if( xHandle != NULL )
+    {
+        vTaskDelete( xHandle );
+    }
+
+    //GPIO config for the clk pin.
+    gpio_config_t io_conf={
+        .intr_type=GPIO_PIN_INTR_DISABLE,
+        .mode=GPIO_MODE_OUTPUT,
+        .pull_down_en=0,
+        .pull_up_en=0,
+        .pin_bit_mask=(1<<PIN_NUM_CLK)
+    };
+    //Set up handshake line interrupt.
+    gpio_config(&io_conf);
+    gpio_set_level(PIN_NUM_CLK, 0);
+    vTaskDelay(1/portTICK_RATE_MS);
+    gpio_set_level(PIN_NUM_CLK, 1);
+    vTaskDelay(1/portTICK_RATE_MS);
 }
