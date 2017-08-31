@@ -122,7 +122,6 @@ void handle_key_event(key_event_t keyEvent)
                     */
                     enter_sleep();
                 } else if (keyEvent.key_value == KEY_HOLD) {
-                    /*
                     clear_hold++;
                     if (clear_hold >= 10) {
                         printf("enter calibration mode\n");
@@ -130,7 +129,6 @@ void handle_key_event(key_event_t keyEvent)
                         working_mode = WORKING_MODE_CALIBRATION;
                         adc_calibration(true);
                     }
-                    */
                 }
                 break;
             case SLEEP_KEY:
