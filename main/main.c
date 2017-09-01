@@ -21,6 +21,7 @@
 #define WORKING_MODE_NORMAL         0
 #define WORKING_MODE_CALIBRATION    1
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
+#define REPEAT_COUNT_CALIBRATION    6
 
 extern void bt_init();
 extern void gpio_key_init();
@@ -35,11 +36,13 @@ static const char *TAG = "black_stone";
 static int working_mode = WORKING_MODE_NORMAL;
 static int calibrate_tick = -1;
 static int calibrate_index = 0;
-static int clear_hold = 0;
 static bool display_lock[2] = {false, false};
 static int display_lock_count[2] = {0,0};
 static int32_t last_weight[2] = {0,0};
 static bool done = false;
+static int trigger_sleep_count = 0;
+static int key_repeat_count = 0;
+
 
 static void lock_display(int channel, bool lock)
 {
@@ -97,6 +100,24 @@ static void enter_sleep()
     do_sleep();
 }
 
+static int count_key_repeat ()
+{
+    static uint32_t lastDataReadyTime = 0;
+
+    uint32_t currtime=xthal_get_ccount();
+    uint32_t diff=currtime-lastDataReadyTime;
+
+    //consider 500ms (240000*500) as 
+    if ( diff < 120000000 ) {
+        key_repeat_count++;
+    } else {
+        key_repeat_count = 0;
+    }
+    lastDataReadyTime=currtime;
+
+    return key_repeat_count;
+}
+
 void handle_key_event(key_event_t keyEvent)
 {
     if (working_mode == WORKING_MODE_NORMAL) {
@@ -111,24 +132,28 @@ void handle_key_event(key_event_t keyEvent)
                 break;
             case CLEAR_KEY:
                 if (keyEvent.key_value == KEY_DOWN) {
-                    /*
-                    for (int i = 0; i < 2; ++i)
-                    {
-                        set_zero(i,queue_average(&dataQueueBuffer[i]));
-                        setDisplayNumber(i, 0, 0);
-                        // lock_display(i, false);
-                    }
-                    clear_hold = 0;
-                    */
-                    enter_sleep();
-                } else if (keyEvent.key_value == KEY_HOLD) {
-                    clear_hold++;
-                    if (clear_hold >= 10) {
+                    count_key_repeat();
+                }else if (keyEvent.key_value == KEY_UP) {
+                    if (trigger_sleep_count >= 1) {
+                        trigger_sleep_count = 0;
+                        enter_sleep();
+                    }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
+                        //do calibration
                         printf("enter calibration mode\n");
                         beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
-                        adc_calibration(true);
+                        adc_calibration(true);       
+                    }else if (key_repeat_count == 0){
+                        //set zero
+                        for (int i = 0; i < 2; ++i)
+                        {
+                            set_zero(i,queue_average(&dataQueueBuffer[i]));
+                            setDisplayNumber(i, 0, 0);
+                            // lock_display(i, false);
+                        }
                     }
+                } else if (keyEvent.key_value == KEY_HOLD) {
+                    trigger_sleep_count++;
                 }
                 break;
             case SLEEP_KEY:

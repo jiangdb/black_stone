@@ -61,7 +61,7 @@ bool config_write(char* name, int32_t value)
     // After setting any values, nvs_commit() must be called to ensure changes are written
     // to flash storage. Implementations may write to storage at other times,
     // but this is not guaranteed.
-    printf("Committing updates in NVS ... \n");
+    // printf("Committing updates in NVS ... \n");
     err = nvs_commit(config_handle);
     return err == ESP_OK;
 }

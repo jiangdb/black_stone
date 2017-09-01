@@ -70,5 +70,6 @@ bool battery_init()
     }
 
     xTaskCreate(battery_task, "battery_task", 1024*3, NULL, 10, NULL);
+
     return true;
 }

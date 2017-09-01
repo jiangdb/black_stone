@@ -32,7 +32,9 @@ extern void handle_key_event(key_event_t keyEvent);
 #define GPIO_OUTPUT_PIN_SEL  ((1<<GPIO_OUTPUT_IO_LED0) | (1<<GPIO_OUTPUT_IO_LED1) | (1<<GPIO_OUTPUT_IO_SPEAKER) | (1<<GPIO_OUTPUT_IO_VIBRATE))
 #define GPIO_INPUT_IO_KEY_LEFT       32
 #define GPIO_INPUT_IO_KEY_RIGHT      33
-#define GPIO_INPUT_PIN_SEL  (uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT))
+#define GPIO_INPUT_IO_STATE1         35
+#define GPIO_INPUT_IO_STATE2         27
+#define GPIO_INPUT_PIN_SEL  (uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) | ((uint64_t)1<<GPIO_INPUT_IO_STATE1) | ((uint64_t)1<<GPIO_INPUT_IO_STATE2))
 #define ESP_INTR_FLAG_DEFAULT        0
 
 static xQueueHandle gpio_evt_queue = NULL;
@@ -72,6 +74,20 @@ static void gpio_task_example(void* arg)
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
             // printf("gpio_key(%d): %d !!!\n", io_num, val);
+            if (io_num == GPIO_INPUT_IO_STATE1 || io_num == GPIO_INPUT_IO_STATE2 ) {
+                //got charging status change
+                int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
+                int state2 = gpio_get_level(GPIO_INPUT_IO_STATE2);
+
+                if (state1 && state2) {
+                    printf("=======> no charging\n");
+                }else if (state1) {
+                    printf("=======> full charging\n");
+                }else if (state2) {
+                    printf("=======> charging\n");
+                }
+            }
+
             if (io_num == GPIO_INPUT_IO_KEY_LEFT || io_num == GPIO_INPUT_IO_KEY_RIGHT ) {
                 int tick_value = -1;
 
