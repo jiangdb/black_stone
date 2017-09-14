@@ -15,6 +15,7 @@
 #include "key_event.h"
 #include "calibration.h"
 #include "spi_adc.h"
+#include "gpio_adc.h"
 #include "config.h"
 
 #define GPIO_LED_IO                 19
@@ -29,8 +30,6 @@ extern void bs_wifi_init();
 extern bool battery_init();
 extern void beap(int wait, int duration);
 extern void set_calibration(int index, int32_t channel0, int32_t channel1);
-extern queue_buffer_t dataQueueBuffer[2];
-extern queue_buffer_t calibrationQueueBuffer[2];
 
 static const char *TAG = "black_stone";
 static int working_mode = WORKING_MODE_NORMAL;
@@ -42,7 +41,8 @@ static int32_t last_weight[2] = {0,0};
 static bool done = false;
 static int trigger_sleep_count = 0;
 static int key_repeat_count = 0;
-
+static queue_buffer_t* dataQueueBuffer[2] = { &qb_SpiAdcData, &qb_GpioAdcData};
+static queue_buffer_t* calibrationQueueBuffer[2] = { &qb_SpiAdcData, &qb_GpioAdcData};
 
 static void lock_display(int channel, bool lock)
 {
@@ -142,12 +142,13 @@ void handle_key_event(key_event_t keyEvent)
                         printf("enter calibration mode\n");
                         beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
-                        adc_calibration(true);       
+                        adc_calibration(true);
+                        gpio_adc_calibration(true);
                     }else if (key_repeat_count == 0){
                         //set zero
                         for (int i = 0; i < 2; ++i)
                         {
-                            set_zero(i,queue_average(&dataQueueBuffer[i]));
+                            set_zero(i,queue_average(dataQueueBuffer[i]));
                             setDisplayNumber(i, 0, 0);
                             // lock_display(i, false);
                         }
@@ -223,7 +224,7 @@ void app_main()
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
-                int32_t adcValue = queue_average(&dataQueueBuffer[i]);
+                int32_t adcValue = queue_average(dataQueueBuffer[i]);
                 int32_t weight = get_weight(adcValue, i, &precision);
 
                 // change more than 1.5g, unlock display
@@ -256,8 +257,8 @@ void app_main()
             calibrate_tick++;
             // printf("tick: %d\n", calibrate_tick);
             if (calibrate_tick >= 30) {
-                int32_t cal1 = queue_average(&calibrationQueueBuffer[0]);
-                int32_t cal2 = queue_average(&calibrationQueueBuffer[1]);
+                int32_t cal1 = queue_average(calibrationQueueBuffer[0]);
+                int32_t cal2 = queue_average(calibrationQueueBuffer[1]);
                 printf("%d: %d\n", cal1, cal2);
                 set_calibration(calibrate_index++, cal1, cal2);
                 beap(0, 200);
@@ -267,6 +268,7 @@ void app_main()
                     printf("exist calibration mode\n");
                     working_mode = WORKING_MODE_NORMAL;
                     adc_calibration(false);
+                    gpio_adc_calibration(false);
                     calibrate_index = 0;
                     beap(100,400);
                 }

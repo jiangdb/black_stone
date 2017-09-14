@@ -8,6 +8,8 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
+extern queue_buffer_t qb_SpiAdcData;
+extern queue_buffer_t qb_SpiAdcCalibration;
 
 void adc_init();
 void adc_calibration(bool enable);

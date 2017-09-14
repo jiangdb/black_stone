@@ -53,23 +53,19 @@
 #define BUFFER_SIZE           5
 #define CALIBRATION_BUFFER_SIZE   10
 
-static const uint8_t channel_configs[]={
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B,
-    0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A,
-};
+static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
-static int32_t pre_value[2]={0,0};
+static int32_t pre_value = 0;
 static TaskHandle_t xHandle = NULL;
-queue_buffer_t dataQueueBuffer[2];
-int32_t dataBuffer[2][BUFFER_SIZE];
-
-queue_buffer_t calibrationQueueBuffer[2];
-int32_t calibrationBuffer[2][CALIBRATION_BUFFER_SIZE];
+queue_buffer_t qb_SpiAdcData;
+int32_t dataBuffer[BUFFER_SIZE];
+queue_buffer_t qb_SpiAdcCalibration;
+int32_t calibrationBuffer[CALIBRATION_BUFFER_SIZE];
 
 /*
 This ISR is called when the data line goes low.
@@ -105,7 +101,7 @@ static void gpio_spi_switch(uint8_t mode)
     }
 }
 
-static int32_t parse_adc(int channel, uint8_t data[4])
+static int32_t parse_adc(uint8_t data[4])
 {
     int32_t value = 0;
 
@@ -115,12 +111,8 @@ static int32_t parse_adc(int channel, uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    /*
-    if (channel == 0) {
-        printf("adc value[%d]: (int)%d  ", channel, value >> PRECISION );
-        print_bin(value, 3);
-    }
-    */
+    printf("spi adc value: (int)%d  ", value >> PRECISION );
+    print_bin(value, 3);
 
     /*
     //check if we need -1
@@ -146,7 +138,7 @@ static int32_t parse_adc(int channel, uint8_t data[4])
     return value;
 }
 
-static int32_t config(int8_t config)
+static void config(int8_t config)
 {
     esp_err_t ret;
     //Prepare spi receive buffer
@@ -167,19 +159,13 @@ static int32_t config(int8_t config)
     ret=spi_device_queue_trans(spi, &trans[1], portMAX_DELAY);
     assert(ret==ESP_OK);
 
-    int32_t value = 0;
     //Wait for all 2 transactions to be done and get back the results.
     for (int x=0; x<2; x++) {
         ret=spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
         assert(ret==ESP_OK);
-        if ( x==0 ) {
-            value = parse_adc(config&CH_SEL_B?0:1, rtrans->rx_data);
-        }
     }
-    return value;
 }
 
-#if SINGLE_CHANNLE    
 static int32_t read_only()
 {
     esp_err_t ret;
@@ -189,25 +175,23 @@ static int32_t read_only()
     t.flags=SPI_TRANS_USE_RXDATA;      //The data is the cmd itself
     ret=spi_device_transmit(spi, &t);  //Transmit!
     assert(ret==ESP_OK);               //Should have had no issues.
-    return parse_adc(1,t.rx_data);
+    return parse_adc(t.rx_data);
 }
-#endif
 
-static void push_to_buffer(int channel, int32_t value)
+static void push_to_buffer(int32_t value)
 {
     queue_buffer_t *pBuffer;
     if (calibration_enable) {
-        pBuffer = &calibrationQueueBuffer[channel];
+        pBuffer = &qb_SpiAdcCalibration;
     }else{
-        pBuffer = &dataQueueBuffer[channel];
+        pBuffer = &qb_SpiAdcData;
     }
 
-    int32_t last = pre_value[channel];
-    if (abs(last - value) >=2 ){
+    if (abs(pre_value - value) >=2 ){
         queue_buffer_push(pBuffer, value);
-        pre_value[channel] = value;
+        pre_value = value;
     }else{
-        queue_buffer_push(pBuffer, last);
+        queue_buffer_push(pBuffer, pre_value);
     }
 }
 
@@ -258,32 +242,22 @@ static void adc_gpio_init()
 
 static void adc_loop()
 {
-    uint8_t ch = 0;
     int32_t v = 0;
-#if SINGLE_CHANNLE    
     bool configed = false;
-    uint8_t conf = 0;
-#endif
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
 
-#if SINGLE_CHANNLE
         if (!configed) {
-            conf = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_B);
-            v = config(conf);
+            config(channel_configs);
             configed  = true;
         }else{
             v = read_only();
-            push_to_buffer(1, v);
+            push_to_buffer(v);
         }
-#else
-        v = config(channel_configs[ch]);
-        push_to_buffer(ch, v);
-        ch = (ch == 0 ? 1:0);
-#endif
+
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable gpio again and wait for data
@@ -306,12 +280,10 @@ void adc_init()
 
     // Queue Buffer init
     memset(dataBuffer,0,sizeof(dataBuffer));
-    queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], BUFFER_SIZE);
-    queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], BUFFER_SIZE);
+    queue_buffer_init(&qb_SpiAdcData, dataBuffer, BUFFER_SIZE);
 
-    memset(calibrationQueueBuffer,0,sizeof(calibrationQueueBuffer));
-    queue_buffer_init(&calibrationQueueBuffer[0], calibrationBuffer[0], CALIBRATION_BUFFER_SIZE);
-    queue_buffer_init(&calibrationQueueBuffer[1], calibrationBuffer[1], CALIBRATION_BUFFER_SIZE);
+    memset(calibrationBuffer,0,sizeof(calibrationBuffer));
+    queue_buffer_init(&qb_SpiAdcCalibration, calibrationBuffer, CALIBRATION_BUFFER_SIZE);
 
     //Create task
     xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
