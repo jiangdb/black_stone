@@ -309,7 +309,7 @@ void adc_init()
     queue_buffer_init(&dataQueueBuffer[0], dataBuffer[0], BUFFER_SIZE);
     queue_buffer_init(&dataQueueBuffer[1], dataBuffer[1], BUFFER_SIZE);
 
-    memset(calibrationQueueBuffer,0,sizeof(calibrationQueueBuffer));
+    memset(calibrationBuffer,0,sizeof(calibrationBuffer));
     queue_buffer_init(&calibrationQueueBuffer[0], calibrationBuffer[0], CALIBRATION_BUFFER_SIZE);
     queue_buffer_init(&calibrationQueueBuffer[1], calibrationBuffer[1], CALIBRATION_BUFFER_SIZE);
 
