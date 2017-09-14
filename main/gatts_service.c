@@ -520,6 +520,12 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
+void bt_stop()
+{
+    // esp_bluedroid_disable();
+    // esp_bt_controller_disable();
+}
+
 void bt_init()
 {
     esp_err_t ret;

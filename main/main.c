@@ -32,7 +32,9 @@ enum {
 };
 
 extern void bt_init();
+extern void bt_stop();
 extern void bs_wifi_init();
+extern void bs_wifi_stop();
 extern void set_calibration(int index, int32_t channel0, int32_t channel1);
 extern queue_buffer_t dataQueueBuffer[2];
 extern queue_buffer_t calibrationQueueBuffer[2];
@@ -108,6 +110,7 @@ static bool is_wakeup_by_key()
 {
     if (esp_deep_sleep_get_wakeup_cause() == ESP_DEEP_SLEEP_WAKEUP_EXT1) {
         uint64_t wakeup_pin_mask = esp_deep_sleep_get_ext1_wakeup_status();
+        printf("wakeup_pin_mask: %llx\n", wakeup_pin_mask);
         if (wakeup_pin_mask != 0) {
             int pin = __builtin_ffsll(wakeup_pin_mask) - 1;
             printf("Wake up from GPIO %d\n", pin);
@@ -361,6 +364,8 @@ void app_main()
 
     bs_timer_stop();
     adc_shutdown();
+    bt_stop();
+    bs_wifi_stop();
     battery_stop();
     display_stop();
     esp_restart();

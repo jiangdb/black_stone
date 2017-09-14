@@ -168,7 +168,7 @@ void gpio_key_init()
     xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
 
     //install gpio isr service
-    // gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_LEFT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_LEFT);
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_RIGHT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_RIGHT);
