@@ -63,27 +63,26 @@
 #define NUMBER_OFF              0x00
 #define OPT_DASH                0x40
 
-
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
 
 static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
-    NUMBER_1,
-    NUMBER_2,
-    NUMBER_3,
-    NUMBER_4,
-    NUMBER_5,
-    NUMBER_6,
-    NUMBER_7,
-    NUMBER_8,
-    NUMBER_0,
-    NUMBER_0,
-    NUMBER_0|0x80,
-    NUMBER_0,
-    0x7F,
-    0x02,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
 
 static uint8_t numbers[] = {
@@ -283,18 +282,40 @@ void spi_trassfer_display()
 
 }
 
-void display_shutdown()
+static void clear_display_data()
 {
-    if( xHandle != NULL )
-    {
-        vTaskDelete( xHandle );
-    }
-
     for (int i = 1; i < sizeof(display_data); ++i)
     {
         display_data[i] = 0;
     }
-    spi_trassfer_display();
+}
+
+void display_indicate_charge()
+{
+    int count = 6;
+    clear_display_data();
+
+    while(count > 0) {
+        if (count%2 == 0) {
+            setBatteryLevel(BATTERY_LEVEL_EMPTY);
+        }else{
+            clear_display_data();
+        }
+
+        spi_trassfer_display();
+        vTaskDelay(200/portTICK_RATE_MS);
+        count--;
+    }
+}
+
+void display_indicate_charging()
+{
+    static int level = BATTERY_LEVEL_EMPTY;
+    clear_display_data();
+    setBatteryLevel(level++);
+    if (level > BATTERY_LEVEL_3) {
+        level = BATTERY_LEVEL_EMPTY;
+    }
 }
 
 void display_loop()
@@ -303,6 +324,23 @@ void display_loop()
         spi_trassfer_display();
         vTaskDelay(100/portTICK_RATE_MS);
     }
+}
+
+void display_start()
+{
+    //Create task
+    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
+}
+
+void display_stop()
+{
+    if( xHandle != NULL )
+    {
+        vTaskDelete( xHandle );
+    }
+
+    clear_display_data();
+    spi_trassfer_display();
 }
 
 void display_init()
@@ -331,7 +369,4 @@ void display_init()
     //Attach the LCD to the SPI bus
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
     assert(ret==ESP_OK);
-
-    //Create task
-    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
 }

@@ -14,11 +14,14 @@
 #define BATTERY_LEVEL_3				3
 
 void display_init();
+void display_start();
+void display_stop();
+void display_indicate_charge();
+void display_indicate_charging();
 void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(bool wifi, bool sound);
 void spi_trassfer_display();
-void display_init();
-void display_shutdown();
+
 #endif  /*_DISPLAY_H_*/
