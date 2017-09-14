@@ -145,9 +145,9 @@ void handle_key_event(key_event_t keyEvent)
     switch(work_status) {
         case WORK_STATUS_CHARGING_SLEEP:
             if (keyEvent.key_type == NOT_CHARGE_KEY) {
-
+                charging = false;
             }else if (keyEvent.key_type == CLEAR_KEY) {
-
+                no_key_start = false;
             }
             break;
         case WORK_STATUS_NORMAL:
