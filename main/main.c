@@ -114,7 +114,7 @@ static bool is_wakeup_by_key()
         if (wakeup_pin_mask != 0) {
             int pin = __builtin_ffsll(wakeup_pin_mask) - 1;
             printf("Wake up from GPIO %d\n", pin);
-            if (pin == GPIO_INPUT_IO_KEY_RIGHT) {
+            if (pin == 1) {
                 return true;
             }
         }
