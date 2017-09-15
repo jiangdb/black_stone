@@ -20,6 +20,7 @@
 #define ESP_INTR_FLAG_DEFAULT        0
 
 void gpio_key_init();
+void gpio_key_start();
 void beap(int wait, int duration);
 bool is_charging();
 

@@ -78,7 +78,7 @@ static void led_on()
     gpio_set_level(GPIO_LED_IO, 1);
 }
 
-static void do_sleep()
+static void enter_sleep()
 {
     const int ext_wakeup_pin_1 = GPIO_INPUT_IO_KEY_RIGHT;               //power
     const uint64_t ext_wakeup_pin_1_mask = 1ULL << ext_wakeup_pin_1;
@@ -90,20 +90,6 @@ static void do_sleep()
 
     printf("enter sleep now\n");
     esp_deep_sleep_start();
-}
-
-static void enter_sleep()
-{
-    printf("enter sleep\n");
-
-    //turn off display
-    display_stop();
-
-    //turn off adc
-    adc_shutdown();
-
-    //do sleep
-    do_sleep();
 }
 
 static bool is_wakeup_by_key()
@@ -148,6 +134,8 @@ void handle_key_event(key_event_t keyEvent)
                 charging = false;
             }else if (keyEvent.key_type == CLEAR_KEY) {
                 no_key_start = false;
+            }else if (keyEvent.key_type == TIMER_KEY) {
+                charging = false;
             }
             break;
         case WORK_STATUS_NORMAL:
@@ -166,13 +154,14 @@ void handle_key_event(key_event_t keyEvent)
                     }else if (keyEvent.key_value == KEY_UP) {
                         if (trigger_sleep_count >= 1) {
                             trigger_sleep_count = 0;
-                            enter_sleep();
+                            // enter_sleep();
+                            done = true;
                         }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
                             //do calibration
                             printf("enter calibration mode\n");
                             beap(0, 400);
                             work_status = WORK_STATUS_CALIBRATION;
-                            adc_calibration(true);       
+                            adc_calibration(true);
                         }else if (key_repeat_count == 0){
                             //set zero
                             for (int i = 0; i < 2; ++i)
@@ -189,6 +178,12 @@ void handle_key_event(key_event_t keyEvent)
                 case SLEEP_KEY:
                     // enter_sleep();
                     done = true;
+                    break;
+                case CHARGE_KEY:
+                    display_indicate_charging();
+                    break;
+                case NOT_CHARGE_KEY:
+                    display_disable_charging();
                     break;
                 default:
                     break;
@@ -229,7 +224,7 @@ void app_main()
     if (!is_charging() && is_battery_extremely_low()) {
         printf("not charging and battery extremely low\n");
         //enter sleep
-        do_sleep();
+        enter_sleep();
     }
 
     printf("init display\n");
@@ -241,10 +236,10 @@ void app_main()
     if (!is_charging() && is_battery_level_low()) {
         printf("not charging and battery low\n");
         //indicate charge
-        display_indicate_charge();
+        display_indicate_charge_only();
         //enter sleep
         display_stop();
-        do_sleep();
+        enter_sleep();
     }
 
     // wake up by use means not by key
@@ -259,14 +254,14 @@ void app_main()
 
         //loop to get power key and charge event
         while(charging && no_key_start) {
-            display_indicate_charging();
-            vTaskDelay(500/portTICK_RATE_MS);
+            display_indicate_charging_only();
+            vTaskDelay(1000/portTICK_RATE_MS);
         }
 
         if (!charging) {
             //enter sleep
             display_stop();
-            do_sleep();
+            enter_sleep();
         }else{
             //reset status to init
             work_status = WROK_STATUS_INIT;
@@ -283,22 +278,29 @@ void app_main()
     /* start battery */
     battery_start();
 
+    /* start keyboard */
+    gpio_key_start();
+
     /* config */
     config_init();
     get_zero();
     get_calibrations();
 
     /* Initialise wifi */
-    bs_wifi_init();
+    // bs_wifi_init();
 
     /* Initialise bluetooth */
-    bt_init();
+    // bt_init();
 
     /* Initialise adc */
     adc_init();
 
     /* Initialise timer */
     bs_timer_init();
+
+    if (is_charging()) {
+        display_indicate_charging();    
+    }
 
     printf("enter main loop!!!\n");
     work_status = WORK_STATUS_NORMAL;
@@ -364,9 +366,13 @@ void app_main()
 
     bs_timer_stop();
     adc_shutdown();
-    bt_stop();
-    bs_wifi_stop();
+    // bt_stop();
+    // bs_wifi_stop();
     battery_stop();
     display_stop();
-    esp_restart();
+    if (is_charging()) {
+        esp_restart();
+    }else{
+        enter_sleep();
+    }
 }

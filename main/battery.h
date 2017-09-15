@@ -8,5 +8,6 @@ void battery_start();
 void battery_stop();
 bool is_battery_level_low();
 bool is_battery_extremely_low();
+int get_battery_level();
 
 #endif  /*_BS_BATTERY_H_*/

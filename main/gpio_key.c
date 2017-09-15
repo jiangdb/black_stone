@@ -24,6 +24,7 @@ extern void handle_key_event(key_event_t keyEvent);
 extern int get_work_status();
 
 static xQueueHandle gpio_evt_queue = NULL;
+static bool enable_beep_vibrate = false;
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -77,14 +78,16 @@ static void gpio_task_example(void* arg)
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
                 int state2 = gpio_get_level(GPIO_INPUT_IO_STATE2);
 
+                key_event_t keyEvent;
                 if (state1 && state2) {
-                    printf("=======> charging\n");
+                    keyEvent.key_type = CHARGE_KEY;
+                    handle_key_event(keyEvent);
                 }else if (state2) {
-                    printf("=======> no charging, usb unplugged\n");
+                    keyEvent.key_type = NOT_CHARGE_KEY;
                 }else if (state1) {
-                    printf("=======> uknown status\n");
                 }else{
-                    printf("=======> full charging\n");
+                    keyEvent.key_type = NOT_CHARGE_KEY;
+                    handle_key_event(keyEvent);
                 }
             }
 
@@ -93,7 +96,9 @@ static void gpio_task_example(void* arg)
 
                 //beap and vibrate
                 if (val == 1) {
-                    beap_vibrate();
+                    if (enable_beep_vibrate){
+                        beap_vibrate();
+                    }
                     tick_value = 0;
                 }
 
@@ -136,6 +141,13 @@ static void gpio_task_example(void* arg)
     }
 }
 
+void gpio_key_start()
+{
+    gpio_set_level(GPIO_OUTPUT_IO_LED0, 1);
+    gpio_set_level(GPIO_OUTPUT_IO_LED1, 1);
+    enable_beep_vibrate = true;
+}
+
 void gpio_key_init()
 {
     gpio_config_t io_conf;
@@ -176,8 +188,8 @@ void gpio_key_init()
     gpio_isr_handler_add(GPIO_INPUT_IO_STATE2, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE2);
 
     //set output level
-    gpio_set_level(GPIO_OUTPUT_IO_LED0, 1);
-    gpio_set_level(GPIO_OUTPUT_IO_LED1, 1);
+    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
+    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
     gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
     gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
 }

@@ -16,6 +16,7 @@
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 #include "display.h"
+#include "battery.h"
 #include "calibration.h"
 #include "queue_buffer.h"
 
@@ -107,6 +108,7 @@ static uint8_t battery_levels[] = {
 
 static spi_device_handle_t spi;
 static TaskHandle_t xHandle = NULL;
+static int iChargingCount = 0;
 
 void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
 {
@@ -192,21 +194,9 @@ void setDisplayTime(uint32_t seconds)
 
 void setBatteryLevel(int batteryLevel)
 {
-    switch(batteryLevel) {
-        case BATTERY_LEVEL_EMPTY:
-            display_data[BATTERY_ADDRESS] = battery_levels[0];
-            break;
-        case BATTERY_LEVEL_1:
-            display_data[BATTERY_ADDRESS] = battery_levels[1];
-            break;
-        case BATTERY_LEVEL_2:
-            display_data[BATTERY_ADDRESS] = battery_levels[2];
-            break;
-        case BATTERY_LEVEL_3:
-            display_data[BATTERY_ADDRESS] = battery_levels[3];
-            break;
-        default:
-            break;
+    if (iChargingCount == 0) {
+        if (batteryLevel < BATTERY_LEVEL_EMPTY || batteryLevel > BATTERY_LEVEL_3) return;
+        display_data[BATTERY_ADDRESS] = battery_levels[batteryLevel];
     }
 }
 
@@ -290,7 +280,7 @@ static void clear_display_data()
     }
 }
 
-void display_indicate_charge()
+void display_indicate_charge_only()
 {
     int count = 6;
     clear_display_data();
@@ -303,24 +293,50 @@ void display_indicate_charge()
         }
 
         spi_trassfer_display();
-        vTaskDelay(200/portTICK_RATE_MS);
+        vTaskDelay(300/portTICK_RATE_MS);
         count--;
     }
 }
 
-void display_indicate_charging()
+static void increase_battery_level()
 {
     static int level = BATTERY_LEVEL_EMPTY;
-    clear_display_data();
-    setBatteryLevel(level++);
+    display_data[BATTERY_ADDRESS] = battery_levels[level++];
     if (level > BATTERY_LEVEL_3) {
         level = BATTERY_LEVEL_EMPTY;
     }
 }
 
+void display_indicate_charging_only()
+{
+    clear_display_data();
+    increase_battery_level();
+    spi_trassfer_display();
+}
+
+void display_indicate_charging()
+{
+    printf("indicate charging !!!\n");
+    iChargingCount = 1;
+}
+
+void display_disable_charging()
+{
+    printf("disable indicate charging !!!\n");
+    iChargingCount = 0;
+    int level = get_battery_level();
+    setBatteryLevel(level);
+}
+
 void display_loop()
 {
     while(1) {
+        if (iChargingCount > 0) {
+            if (iChargingCount % 10 == 1) {
+                increase_battery_level();
+            }
+            iChargingCount++;
+        }
         spi_trassfer_display();
         vTaskDelay(100/portTICK_RATE_MS);
     }
@@ -328,6 +344,9 @@ void display_loop()
 
 void display_start()
 {
+    //reset display time
+    setDisplayTime(0);
+
     //Create task
     xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
 }

@@ -61,6 +61,22 @@ void battery_task(void* arg)
     }
 }
 
+int get_battery_level()
+{
+    int voltage = read_voltage();
+
+    if (voltage >= BATTERY_PERCENTAGE_75) {
+        return BATTERY_LEVEL_3;
+    }else if (voltage >= BATTERY_PERCENTAGE_50) {
+        return BATTERY_LEVEL_2;
+    }else if (voltage >= BATTERY_PERCENTAGE_25) {
+        return BATTERY_LEVEL_1;
+    }else if (voltage >= BATTERY_PERCENTAGE_0) {
+        return BATTERY_LEVEL_EMPTY;
+    }
+    return BATTERY_LEVEL_EMPTY;
+}
+
 bool is_battery_extremely_low()
 {
     int voltage = read_voltage();
