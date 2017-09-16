@@ -42,7 +42,7 @@ static bool done = false;
 static int trigger_sleep_count = 0;
 static int key_repeat_count = 0;
 static queue_buffer_t* dataQueueBuffer[2] = { &qb_SpiAdcData, &qb_GpioAdcData};
-static queue_buffer_t* calibrationQueueBuffer[2] = { &qb_SpiAdcData, &qb_GpioAdcData};
+static queue_buffer_t* calibrationQueueBuffer[2] = { &qb_SpiAdcCalibration, &qb_GpioAdcCalibration};
 
 static void lock_display(int channel, bool lock)
 {
@@ -95,6 +95,7 @@ static void enter_sleep()
 
     //turn off adc
     adc_shutdown();
+    gpio_adc_shutdown();
 
     //do sleep
     do_sleep();
@@ -197,6 +198,7 @@ void app_main()
 
     /* Initialise adc */
     adc_init();
+    gpio_adc_init();
 
     /* Initialise display */
     display_init();
