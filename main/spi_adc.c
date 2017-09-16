@@ -63,9 +63,9 @@ static bool calibration_enable = false;
 static int32_t pre_value = 0;
 static TaskHandle_t xHandle = NULL;
 queue_buffer_t qb_SpiAdcData;
-int32_t dataBuffer[BUFFER_SIZE];
+int32_t spiDataBuffer[BUFFER_SIZE];
 queue_buffer_t qb_SpiAdcCalibration;
-int32_t calibrationBuffer[CALIBRATION_BUFFER_SIZE];
+int32_t spiCalibrationBuffer[CALIBRATION_BUFFER_SIZE];
 
 /*
 This ISR is called when the data line goes low.
@@ -111,8 +111,8 @@ static int32_t parse_adc(uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    printf("spi adc value: (int)%d  ", value >> PRECISION );
-    print_bin(value, 3);
+    // printf("spi adc value: (int)%d  ", value >> PRECISION );
+    // print_bin(value, 3);
 
     /*
     //check if we need -1
@@ -279,11 +279,11 @@ void adc_init()
     adc_gpio_init();
 
     // Queue Buffer init
-    memset(dataBuffer,0,sizeof(dataBuffer));
-    queue_buffer_init(&qb_SpiAdcData, dataBuffer, BUFFER_SIZE);
+    memset(spiDataBuffer,0,sizeof(spiDataBuffer));
+    queue_buffer_init(&qb_SpiAdcData, spiDataBuffer, BUFFER_SIZE);
 
-    memset(calibrationBuffer,0,sizeof(calibrationBuffer));
-    queue_buffer_init(&qb_SpiAdcCalibration, calibrationBuffer, CALIBRATION_BUFFER_SIZE);
+    memset(spiCalibrationBuffer,0,sizeof(spiCalibrationBuffer));
+    queue_buffer_init(&qb_SpiAdcCalibration, spiCalibrationBuffer, CALIBRATION_BUFFER_SIZE);
 
     //Create task
     xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);

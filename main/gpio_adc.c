@@ -88,8 +88,8 @@ static int32_t parse_adc(int32_t adcValue)
         value = 0xFF000000|adcValue;
     }
 
-    printf("gpio adc value: (int)%d  ", value >> PRECISION );
-    print_bin(value, 3);
+    // printf("gpio adc value: (int)%d  ", value >> PRECISION );
+    // print_bin(value, 3);
 
     /*
     //check if we need -1
