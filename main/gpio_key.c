@@ -84,6 +84,7 @@ static void gpio_task_example(void* arg)
                     handle_key_event(keyEvent);
                 }else if (state2) {
                     keyEvent.key_type = NOT_CHARGE_KEY;
+                    handle_key_event(keyEvent);
                 }else if (state1) {
                 }else{
                     keyEvent.key_type = NOT_CHARGE_KEY;
