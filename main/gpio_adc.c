@@ -1,5 +1,4 @@
-/* SPI Master example
-
+/*
    This example code is in the Public Domain (or CC0 licensed, at your option.)
 
    Unless required by applicable law or agreed to in writing, this
@@ -11,9 +10,9 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_system.h"
 #include "esp_log.h"
-#include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 #include "queue_buffer.h"
