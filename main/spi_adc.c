@@ -23,7 +23,6 @@
 */
 #define TAG                   "ADC"
 
-#define SINGLE_CHANNLE        0
 #define PRECISION             6
 
 #define PIN_NUM_DATA          23
@@ -50,7 +49,9 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define BUFFER_SIZE           5
+
+#define USE_QUEUE_BUFFER          0
+#define BUFFER_SIZE               5
 #define CALIBRATION_BUFFER_SIZE   10
 
 static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
@@ -60,12 +61,17 @@ static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
-static int32_t pre_value = 0;
 static TaskHandle_t xHandle = NULL;
-queue_buffer_t qb_SpiAdcData;
-int32_t spiDataBuffer[BUFFER_SIZE];
-queue_buffer_t qb_SpiAdcCalibration;
-int32_t spiCalibrationBuffer[CALIBRATION_BUFFER_SIZE];
+
+#if USE_QUEUE_BUFFER
+static int32_t pre_value = 0;
+static queue_buffer_t qb_SpiAdcData;
+static int32_t spiDataBuffer[BUFFER_SIZE];
+static queue_buffer_t qb_SpiAdcCalibration;
+static int32_t spiCalibrationBuffer[CALIBRATION_BUFFER_SIZE];
+#else
+static int32_t spi_adc_value = 0;
+#endif
 
 /*
 This ISR is called when the data line goes low.
@@ -111,8 +117,8 @@ static int32_t parse_adc(uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    // printf("spi adc value: (int)%d  ", value >> PRECISION );
-    // print_bin(value, 3);
+    printf("spi adc value: (int)%d  ", value >> PRECISION );
+    print_bin(value, 3);
 
     /*
     //check if we need -1
@@ -180,6 +186,7 @@ static int32_t read_only()
 
 static void push_to_buffer(int32_t value)
 {
+#if USE_QUEUE_BUFFER     
     queue_buffer_t *pBuffer;
     if (calibration_enable) {
         pBuffer = &qb_SpiAdcCalibration;
@@ -193,6 +200,12 @@ static void push_to_buffer(int32_t value)
     }else{
         queue_buffer_push(pBuffer, pre_value);
     }
+#else
+    if (abs(spi_adc_value - value) >=2 ){
+        spi_adc_value = value;
+    }
+    printf("spi_adc_value: %d\n", spi_adc_value);
+#endif
 }
 
 static void spi_init()
@@ -243,13 +256,13 @@ static void adc_gpio_init()
 static void adc_loop()
 {
     int32_t v = 0;
-    bool configed = false;
+    // bool configed = false;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
-
+/*
         if (!configed) {
             config(channel_configs);
             configed  = true;
@@ -257,6 +270,9 @@ static void adc_loop()
             v = read_only();
             push_to_buffer(v);
         }
+        */
+        v = read_only();
+        push_to_buffer(v);
 
         vTaskDelay(10/portTICK_RATE_MS);
 
@@ -265,36 +281,25 @@ static void adc_loop()
     }
 }
 
-void adc_init()
+int32_t spi_adc_get_value()
 {
-    printf("%s: CS1238 start!!!\n", TAG);
-
-    //Create the semaphore.
-    rdySem=xSemaphoreCreateBinary();
-
-    //SPI config
-    spi_init();
-
-    //GPIO config
-    adc_gpio_init();
-
-    // Queue Buffer init
-    memset(spiDataBuffer,0,sizeof(spiDataBuffer));
-    queue_buffer_init(&qb_SpiAdcData, spiDataBuffer, BUFFER_SIZE);
-
-    memset(spiCalibrationBuffer,0,sizeof(spiCalibrationBuffer));
-    queue_buffer_init(&qb_SpiAdcCalibration, spiCalibrationBuffer, CALIBRATION_BUFFER_SIZE);
-
-    //Create task
-    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
+#if USE_QUEUE_BUFFER
+    if (calibration_enable) {
+        return queue_average(qb_SpiAdcCalibration);
+    }else{
+        return queue_average(qb_SpiAdcData);
+    }
+#else
+    return spi_adc_value;
+#endif
 }
 
-void adc_calibration(bool enable)
+void spi_adc_calibration(bool enable)
 {
     calibration_enable = enable;
 }
 
-void adc_shutdown()
+void spi_adc_shutdown()
 {
     if( xHandle != NULL )
     {
@@ -315,4 +320,30 @@ void adc_shutdown()
     vTaskDelay(1/portTICK_RATE_MS);
     gpio_set_level(PIN_NUM_CLK, 1);
     vTaskDelay(1/portTICK_RATE_MS);
+}
+
+void spi_adc_init()
+{
+    printf("%s: CS1238 start!!!\n", TAG);
+
+    //Create the semaphore.
+    rdySem=xSemaphoreCreateBinary();
+
+    //SPI config
+    spi_init();
+
+    //GPIO config
+    adc_gpio_init();
+
+#if USE_QUEUE_BUFFER     
+    // Queue Buffer init
+    memset(spiDataBuffer,0,sizeof(spiDataBuffer));
+    queue_buffer_init(&qb_SpiAdcData, spiDataBuffer, BUFFER_SIZE);
+
+    memset(spiCalibrationBuffer,0,sizeof(spiCalibrationBuffer));
+    queue_buffer_init(&qb_SpiAdcCalibration, spiCalibrationBuffer, CALIBRATION_BUFFER_SIZE);
+#endif
+
+    //Create task
+    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
 }

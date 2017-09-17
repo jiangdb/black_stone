@@ -8,11 +8,12 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
-extern queue_buffer_t qb_SpiAdcData;
-extern queue_buffer_t qb_SpiAdcCalibration;
+// extern queue_buffer_t qb_SpiAdcData;
+// extern queue_buffer_t qb_SpiAdcCalibration;
 
-void adc_init();
-void adc_calibration(bool enable);
-void adc_shutdown();
+void spi_adc_init();
+void spi_adc_calibration(bool enable);
+void spi_adc_shutdown();
+int32_t spi_adc_get_value();
 
 #endif  /*_SPI_ADC_H_*/

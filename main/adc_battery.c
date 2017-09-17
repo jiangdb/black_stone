@@ -30,8 +30,8 @@ void battery_task(void* arg)
         voltage = (adcValue*ADC1_REF*2)/512;
         voltage = (voltage+50)/100*100;
 
-        printf("The adc1 value:%d\n",adcValue);
-        printf("battery voltage:%d\n",voltage);
+        // printf("The adc1 value:%d\n",adcValue);
+        // printf("battery voltage:%d\n",voltage);
 
         if (voltage >= BATTERY_PERCENTAGE_75) {
         	setBatteryLevel(BATTERY_LEVEL_3);

@@ -45,7 +45,8 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define BUFFER_SIZE           5
+#define USE_QUEUE_BUFFER          0
+#define BUFFER_SIZE               5
 #define CALIBRATION_BUFFER_SIZE   10
 
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
@@ -54,13 +55,17 @@ static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH
 static SemaphoreHandle_t rdySem = NULL;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
-static int32_t pre_value = 0;
 static TaskHandle_t xHandle = NULL;
-queue_buffer_t qb_GpioAdcData;
-int32_t dataBuffer[BUFFER_SIZE];
 
-queue_buffer_t qb_GpioAdcCalibration;
-int32_t calibrationBuffer[CALIBRATION_BUFFER_SIZE];
+#if USE_QUEUE_BUFFER
+static int32_t pre_value = 0;
+static queue_buffer_t qb_GpioAdcData;
+static int32_t dataBuffer[BUFFER_SIZE];
+static queue_buffer_t qb_GpioAdcCalibration;
+static int32_t calibrationBuffer[CALIBRATION_BUFFER_SIZE];
+#else
+static int32_t gpio_adc_value = 0;
+#endif
 
 /*
 This ISR is called when the data line goes low.
@@ -206,11 +211,12 @@ static int32_t read_only()
 
 static void push_to_buffer(int32_t value)
 {
+#if USE_QUEUE_BUFFER     
     queue_buffer_t *pBuffer;
     if (calibration_enable) {
-        pBuffer = &qb_GpioAdcCalibration;
+        pBuffer = &qb_SpiAdcCalibration;
     }else{
-        pBuffer = &qb_GpioAdcData;
+        pBuffer = &qb_SpiAdcData;
     }
 
     if (abs(pre_value - value) >=2 ){
@@ -219,18 +225,24 @@ static void push_to_buffer(int32_t value)
     }else{
         queue_buffer_push(pBuffer, pre_value);
     }
+#else
+    if (abs(gpio_adc_value - value) >=2 ){
+        gpio_adc_value = value;
+    }
+#endif
 }
 
 static void adc_loop()
 {
     int32_t v = 0;
-    bool configed = false;
+    // bool configed = false;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable data int
         gpio_intr_disable(PIN_NUM_DATA);
 
+/*
         if (!configed) {
             config(channel_config);
             configed  = true;
@@ -238,6 +250,7 @@ static void adc_loop()
             v = read_only();
             push_to_buffer(v);
         }
+        */
 
         vTaskDelay(10/portTICK_RATE_MS);
 
@@ -245,6 +258,19 @@ static void adc_loop()
         lastDataReadyTime=xthal_get_ccount();
         gpio_intr_enable(PIN_NUM_DATA);
     }
+}
+
+int32_t gpio_adc_get_value()
+{
+#if USE_QUEUE_BUFFER
+    if (calibration_enable) {
+        return queue_average(spiCalibrationBuffer);
+    }else{
+        return queue_average(qb_SpiAdcData);
+    }
+#else
+    return gpio_adc_value;
+#endif
 }
 
 void gpio_adc_calibration(bool enable)
@@ -272,12 +298,14 @@ void gpio_adc_init()
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
 
+#if USE_QUEUE_BUFFER
     // Queue Buffer init
     memset(dataBuffer,0,sizeof(dataBuffer));
     queue_buffer_init(&qb_GpioAdcData, dataBuffer, BUFFER_SIZE);
 
     memset(calibrationBuffer,0,sizeof(calibrationBuffer));
     queue_buffer_init(&qb_GpioAdcCalibration, calibrationBuffer, CALIBRATION_BUFFER_SIZE);
+#endif
 
     //GPIO config
     printf("%s: gpio_init !!!\n", TAG);
