@@ -24,8 +24,8 @@
 
 #define PRECISION             6
 
-#define PIN_NUM_DATA          13
-#define PIN_NUM_CLK           5
+#define GPIO_PIN_NUM_DATA     13
+#define GPIO_PIN_NUM_CLK      5
 
 #define REFO_ON               0x0<<6
 #define REFO_OFF              0x1<<6
@@ -121,9 +121,9 @@ static int32_t parse_adc(int32_t adcValue)
 
 static void send_clk()
 {
-    gpio_set_level(PIN_NUM_CLK, 1);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 1);
     for (int i = 0; i < 10; ++i) {}
-    gpio_set_level(PIN_NUM_CLK, 0);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
     for (int i = 0; i < 10; ++i) {}
 }
 
@@ -141,7 +141,7 @@ static void config(uint8_t config)
     //----------------------------------
     //4：clk28-clk29
     //----------------------------------
-    gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_OUTPUT);
+    gpio_set_direction(GPIO_PIN_NUM_DATA,GPIO_MODE_OUTPUT);
     send_clk();
     send_clk();
 
@@ -153,11 +153,11 @@ static void config(uint8_t config)
     {
         if(command & 0x80)              //MSB
         {
-            gpio_set_level(PIN_NUM_DATA, 1);
+            gpio_set_level(GPIO_PIN_NUM_DATA, 1);
         }
         else
         {
-            gpio_set_level(PIN_NUM_DATA, 0);
+            gpio_set_level(GPIO_PIN_NUM_DATA, 0);
         }
         command = command << 1;
         send_clk();
@@ -175,11 +175,11 @@ static void config(uint8_t config)
     {
         if(config & 0x80)              //MSB
         {
-            gpio_set_level(PIN_NUM_DATA, 1);
+            gpio_set_level(GPIO_PIN_NUM_DATA, 1);
         }
         else
         {
-            gpio_set_level(PIN_NUM_DATA, 0);
+            gpio_set_level(GPIO_PIN_NUM_DATA, 0);
         }
         config = config << 1;
         send_clk();
@@ -188,7 +188,7 @@ static void config(uint8_t config)
     //----------------------------------
     //8：clk46
     //----------------------------------    
-    gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+    gpio_set_direction(GPIO_PIN_NUM_DATA,GPIO_MODE_INPUT);
     send_clk();
 }
 
@@ -199,14 +199,15 @@ static int32_t read_only()
     {
         read <<= 1;
         send_clk();
-        if(gpio_get_level(PIN_NUM_DATA)) {
+        if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
             read |=1 ;
         }
     }
     send_clk();
     send_clk();
     send_clk();
-    return parse_adc(read);
+    return 0;
+    // return parse_adc(read);
 }
 
 static void push_to_buffer(int32_t value)
@@ -232,7 +233,7 @@ static void push_to_buffer(int32_t value)
 #endif
 }
 
-static void adc_loop()
+static void gpio_adc_loop()
 {
     int32_t v = 0;
     // bool configed = false;
@@ -240,7 +241,7 @@ static void adc_loop()
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
         //Disable data int
-        gpio_intr_disable(PIN_NUM_DATA);
+        gpio_intr_disable(GPIO_PIN_NUM_DATA);
 
 /*
         if (!configed) {
@@ -258,7 +259,7 @@ static void adc_loop()
 
         //Enable data int
         lastDataReadyTime=xthal_get_ccount();
-        gpio_intr_enable(PIN_NUM_DATA);
+        gpio_intr_enable(GPIO_PIN_NUM_DATA);
     }
 }
 
@@ -283,22 +284,19 @@ void gpio_adc_calibration(bool enable)
 
 void gpio_adc_shutdown()
 {
-    /*
     if( xHandle != NULL )
     {
         vTaskDelete( xHandle );
     }
 
-    gpio_set_level(PIN_NUM_CLK, 0);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
     vTaskDelay(1/portTICK_RATE_MS);
-    gpio_set_level(PIN_NUM_CLK, 1);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 1);
     vTaskDelay(1/portTICK_RATE_MS);
-    */
 }
 
 void gpio_adc_init()
 {
-    /*
     printf("%s: CS1237 start!!!\n", TAG);
 
     //Create the semaphore.
@@ -320,7 +318,7 @@ void gpio_adc_init()
         .intr_type=GPIO_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
         .pull_down_en=1,
-        .pin_bit_mask=(1<<PIN_NUM_DATA)
+        .pin_bit_mask=(1<<GPIO_PIN_NUM_DATA)
     };
 
     //Set up handshake line interrupt.
@@ -331,20 +329,19 @@ void gpio_adc_init()
     //set as output mode
     io_conf.mode = GPIO_MODE_OUTPUT;
     //bit mask of the pins that you want to set,e.g.GPIO18/19
-    io_conf.pin_bit_mask = (1<<PIN_NUM_CLK);
+    io_conf.pin_bit_mask = (1<<GPIO_PIN_NUM_CLK);
     //disable pull-down mode
     io_conf.pull_down_en = 0;
     //disable pull-up mode
     io_conf.pull_up_en = 0;
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_set_level(PIN_NUM_CLK, 0);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
 
     // gpio_install_isr_service(0);
-    gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
+    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_data_isr_handler, NULL);
 
     //Create task
-    xTaskCreate(&adc_loop, "gpio_adc_task", 4096, NULL, 5, &xHandle);
-    */
+    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xHandle);
 }
 
