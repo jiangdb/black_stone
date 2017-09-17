@@ -251,6 +251,8 @@ static void adc_loop()
             push_to_buffer(v);
         }
         */
+        v = read_only();
+        push_to_buffer(v);
 
         vTaskDelay(10/portTICK_RATE_MS);
 
