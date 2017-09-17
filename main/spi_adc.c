@@ -49,7 +49,6 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-
 #define USE_QUEUE_BUFFER          0
 #define BUFFER_SIZE               5
 #define CALIBRATION_BUFFER_SIZE   10
@@ -345,5 +344,5 @@ void spi_adc_init()
 #endif
 
     //Create task
-    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
+    xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 5, &xHandle);
 }

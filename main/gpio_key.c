@@ -64,7 +64,7 @@ static void beap_vibrate()
     gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
 }
 
-static void gpio_task_example(void* arg)
+static void gpio_key_task(void* arg)
 {
     uint32_t io_num;
     int tick[2]= {-1, -1};
@@ -73,7 +73,7 @@ static void gpio_task_example(void* arg)
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
-            // printf("gpio_key(%d): %d !!!\n", io_num, val);
+            printf("gpio_key(%d): %d !!!\n", io_num, val);
             if (io_num == GPIO_INPUT_IO_STATE1 || io_num == GPIO_INPUT_IO_STATE2 ) {
                 //got charging status change
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
@@ -165,7 +165,7 @@ void gpio_key_init()
     //create a queue to handle gpio event from isr
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     //start gpio task
-    xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+    xTaskCreate(gpio_task_example, "gpio_key_task", 2048, NULL, 10, NULL);
 
     //install gpio isr service
     // gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);

@@ -340,6 +340,6 @@ void gpio_adc_init()
     gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
 
     //Create task
-    xTaskCreate(&adc_loop, "adc_task", 4096, NULL, 5, &xHandle);
+    xTaskCreate(&adc_loop, "gpio_adc_task", 4096, NULL, 5, &xHandle);
 }
 
