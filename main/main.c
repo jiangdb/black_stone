@@ -133,9 +133,9 @@ void handle_key_event(key_event_t keyEvent)
             if (keyEvent.key_type == NOT_CHARGE_KEY) {
                 charging = false;
             }else if (keyEvent.key_type == CLEAR_KEY) {
-                no_key_start = false;
-            }else if (keyEvent.key_type == TIMER_KEY) {
-                charging = false;
+                if (keyEvent.key_value == KEY_UP) {
+                    no_key_start = false;
+                }
             }
             break;
         case WORK_STATUS_NORMAL:
@@ -210,12 +210,8 @@ void app_main()
     printf("BLACK STONE!!!\n");
 	ESP_LOGI(TAG, "Start!!!");
 
-    printf("init battery\n");
-
     //init battery first
     battery_init();
-
-    printf("init key\n");
 
     /* Initialise key */
     gpio_key_init();
@@ -226,8 +222,6 @@ void app_main()
         //enter sleep
         enter_sleep();
     }
-
-    printf("init display\n");
 
     /* Initialise display */
     display_init();
@@ -270,7 +264,6 @@ void app_main()
 
     /* led */
     // led_on();
-    printf("continue startup\n");
 
     /* start display */
     display_start();
