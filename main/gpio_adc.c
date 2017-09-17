@@ -52,10 +52,10 @@
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
-static SemaphoreHandle_t rdySem = NULL;
+static SemaphoreHandle_t dataReadtSem = NULL;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
-static TaskHandle_t xHandle = NULL;
+static TaskHandle_t xReaderTaskHandle = NULL;
 
 #if USE_QUEUE_BUFFER
 static int32_t pre_value = 0;
@@ -70,7 +70,7 @@ static int32_t gpio_adc_value = 0;
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR gpio_data_isr_handler(void* arg)
+static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
@@ -80,7 +80,7 @@ static void IRAM_ATTR gpio_data_isr_handler(void* arg)
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
-    xSemaphoreGiveFromISR(rdySem, &mustYield);
+    xSemaphoreGiveFromISR(dataReadtSem, &mustYield);
     if (mustYield) portYIELD_FROM_ISR();
 }
 
@@ -239,7 +239,7 @@ static void gpio_adc_loop()
     // bool configed = false;
     while(1) {
         //Wait until data is ready
-        xSemaphoreTake( rdySem, portMAX_DELAY );
+        xSemaphoreTake( dataReadtSem, portMAX_DELAY );
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
 
@@ -284,9 +284,9 @@ void gpio_adc_calibration(bool enable)
 
 void gpio_adc_shutdown()
 {
-    if( xHandle != NULL )
+    if( xReaderTaskHandle != NULL )
     {
-        vTaskDelete( xHandle );
+        vTaskDelete( xReaderTaskHandle );
     }
 
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
@@ -300,7 +300,7 @@ void gpio_adc_init()
     printf("%s: CS1237 start!!!\n", TAG);
 
     //Create the semaphore.
-    rdySem=xSemaphoreCreateBinary();
+    dataReadtSem=xSemaphoreCreateBinary();
 
 #if USE_QUEUE_BUFFER
     // Queue Buffer init
@@ -339,9 +339,9 @@ void gpio_adc_init()
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
 
     // gpio_install_isr_service(0);
-    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_data_isr_handler, NULL);
+    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
 
     //Create task
-    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xHandle);
+    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
 }
 
