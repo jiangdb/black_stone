@@ -96,7 +96,7 @@ static bool is_wakeup_by_key()
 {
     if (esp_deep_sleep_get_wakeup_cause() == ESP_DEEP_SLEEP_WAKEUP_EXT1) {
         uint64_t wakeup_pin_mask = esp_deep_sleep_get_ext1_wakeup_status();
-        printf("wakeup_pin_mask: %llx\n", wakeup_pin_mask);
+        // printf("wakeup_pin_mask: %llx\n", wakeup_pin_mask);
         if (wakeup_pin_mask != 0) {
             int pin = __builtin_ffsll(wakeup_pin_mask) - 1;
             printf("Wake up from GPIO %d\n", pin);

@@ -30,8 +30,8 @@ static int read_voltage()
     int adcValue = adc1_get_voltage(ADC1_CHANNEL);
     int voltage = (adcValue*ADC1_REF*2)/512;
 
-    printf("The adc1 value:%d\n",adcValue);
-    printf("battery voltage:%d\n",(voltage+50)/100*100);
+    // printf("The adc1 value:%d\n",adcValue);
+    // printf("battery voltage:%d\n",(voltage+50)/100*100);
 
     return (voltage+50)/100*100;
 }
