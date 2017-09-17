@@ -214,9 +214,9 @@ static void push_to_buffer(int32_t value)
 #if USE_QUEUE_BUFFER     
     queue_buffer_t *pBuffer;
     if (calibration_enable) {
-        pBuffer = &qb_SpiAdcCalibration;
+        pBuffer = &qb_GpioAdcCalibration;
     }else{
-        pBuffer = &qb_SpiAdcData;
+        pBuffer = &qb_GpioAdcData;
     }
 
     if (abs(pre_value - value) >=2 ){
@@ -264,11 +264,12 @@ static void adc_loop()
 
 int32_t gpio_adc_get_value()
 {
+    return 0;
 #if USE_QUEUE_BUFFER
     if (calibration_enable) {
-        return queue_average(spiCalibrationBuffer);
+        return queue_average(qb_GpioAdcCalibration);
     }else{
-        return queue_average(qb_SpiAdcData);
+        return queue_average(qb_GpioAdcData);
     }
 #else
     return gpio_adc_value;
@@ -282,6 +283,7 @@ void gpio_adc_calibration(bool enable)
 
 void gpio_adc_shutdown()
 {
+    /*
     if( xHandle != NULL )
     {
         vTaskDelete( xHandle );
@@ -291,11 +293,13 @@ void gpio_adc_shutdown()
     vTaskDelay(1/portTICK_RATE_MS);
     gpio_set_level(PIN_NUM_CLK, 1);
     vTaskDelay(1/portTICK_RATE_MS);
+    */
 }
 
 void gpio_adc_init()
 {
-    printf("%s: CS1238 start!!!\n", TAG);
+    /*
+    printf("%s: CS1237 start!!!\n", TAG);
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
@@ -336,10 +340,11 @@ void gpio_adc_init()
     gpio_config(&io_conf);
     gpio_set_level(PIN_NUM_CLK, 0);
 
-    gpio_install_isr_service(0);
+    // gpio_install_isr_service(0);
     gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
 
     //Create task
     xTaskCreate(&adc_loop, "gpio_adc_task", 4096, NULL, 5, &xHandle);
+    */
 }
 
