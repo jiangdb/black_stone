@@ -204,7 +204,7 @@ static void push_to_buffer(int32_t value)
     if (abs(spi_adc_value - value) >=2 ){
         spi_adc_value = value;
     }
-    printf("spi_adc_value: %d\n", spi_adc_value);
+    // printf("spi_adc_value: %d\n", spi_adc_value);
 #endif
 }
 
