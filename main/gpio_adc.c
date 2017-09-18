@@ -206,7 +206,7 @@ static int32_t read_only()
             read |=1 ;
         }
         if (i%5==0 && i>0) {
-            portYIELD()
+            portYIELD();
         }
     }
     send_clk();
