@@ -117,8 +117,8 @@ static int32_t parse_adc(uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    printf("spi adc value: (int)%d  ", value >> PRECISION );
-    print_bin(value, 3);
+    // printf("spi adc value: (int)%d  ", value >> PRECISION );
+    // print_bin(value, 3);
 
     /*
     //check if we need -1

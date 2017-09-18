@@ -242,6 +242,7 @@ static void gpio_adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( dataReadtSem, portMAX_DELAY );
+        printf("%s: Got data!!!\n", TAG);
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
 /*

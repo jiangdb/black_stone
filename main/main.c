@@ -216,8 +216,6 @@ void app_main()
     /* Initialise key */
     gpio_key_init();
 
-
-
     printf("working mode :%s!!!\n", working_mode == WORKING_MODE_NORMAL? "normal":"calibration");
 
     while(!done) {
