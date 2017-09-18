@@ -204,7 +204,7 @@ void app_main()
 
     /* Initialise timer */
     bs_timer_init();
-    delay_timer_init();
+    // delay_timer_init();
 
     /* Initialise adc */
     spi_adc_init();
