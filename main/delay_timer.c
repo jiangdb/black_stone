@@ -35,14 +35,13 @@ static SemaphoreHandle_t semDelay5Us = NULL;
 void IRAM_ATTR delay_timer_isr(void *para)
 {
     int timer_idx = (int) para;
-    uint32_t intr_status = TIMERG0.int_st_timers.val;
+    uint32_t intr_status = TIMERG1.int_st_timers.val;
     if((intr_status & BIT(timer_idx)) && timer_idx == DELAY_TIMER_INDEX) {
         /*Timer1 is an example that will reload counter value*/
         TIMERG1.hw_timer[timer_idx].update = 1;
         /*We don't call a API here because they are not declared with IRAM_ATTR*/
-        TIMERG1.int_clr_timers.t1 = 1;
+        TIMERG1.int_clr_timers.t0 = 1;
         // release semaphore
-        //Give the semaphore.
         BaseType_t mustYield=false;
         xSemaphoreGiveFromISR(semDelay5Us, &mustYield);
         if (mustYield) portYIELD_FROM_ISR();
@@ -80,7 +79,7 @@ void delay_timer_init()
     /*Load counter value */
     timer_set_counter_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, 0x00000000ULL);
     /*Set alarm value*/
-    timer_set_alarm_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, TIMER_INTERVAL_5_US * TIMER_SCALE);
+    timer_set_alarm_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, TIMER_INTERVAL_5_US);
     /*Enable timer interrupt*/
     timer_enable_intr(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX);
     /*Set ISR handler*/
