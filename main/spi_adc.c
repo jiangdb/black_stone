@@ -18,6 +18,7 @@
 #include "driver/gpio.h"
 #include "queue_buffer.h"
 #include "util.h"
+#include "esp_heap_alloc_caps.h"
 
 /*
 */
@@ -176,8 +177,8 @@ static int32_t read_only()
     esp_err_t ret;
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));          //Zero out the transaction
-    t.rxlength=27;                     //Command is 8 bits
-    t.flags=SPI_TRANS_USE_RXDATA;      //The data is the cmd itself
+    t.rxlength=27;                     //read is 8 bits
+    t.flags=SPI_TRANS_USE_RXDATA;      //use rxdata to receive data
     ret=spi_device_transmit(spi, &t);  //Transmit!
     assert(ret==ESP_OK);               //Should have had no issues.
     return parse_adc(t.rx_data);
@@ -334,7 +335,7 @@ void spi_adc_init()
     //GPIO config
     adc_gpio_init();
 
-#if USE_QUEUE_BUFFER     
+#if USE_QUEUE_BUFFER
     // Queue Buffer init
     memset(spiDataBuffer,0,sizeof(spiDataBuffer));
     queue_buffer_init(&qb_SpiAdcData, spiDataBuffer, BUFFER_SIZE);

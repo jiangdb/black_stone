@@ -11,6 +11,7 @@
 #include "bt.h"
 #include "display.h"
 #include "bs_timer.h"
+#include "delay_timer.h"
 #include "queue_buffer.h"
 #include "key_event.h"
 #include "calibration.h"
@@ -213,6 +214,7 @@ void app_main()
 
     /* Initialise timer */
     bs_timer_init();
+    delay_timer_init();
 
     printf("working mode :%s!!!\n", working_mode == WORKING_MODE_NORMAL? "normal":"calibration");
 

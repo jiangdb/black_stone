@@ -17,6 +17,7 @@
 #include "driver/gpio.h"
 #include "queue_buffer.h"
 #include "util.h"
+#include "delay_timer.h"
 
 /*
 */
@@ -122,9 +123,11 @@ static int32_t parse_adc(int32_t adcValue)
 static void send_clk()
 {
     gpio_set_level(GPIO_PIN_NUM_CLK, 1);
-    for (int i = 0; i < 10; ++i) {}
+    delay_5us();
+    // for (int i = 0; i < 10; ++i) {}
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
-    for (int i = 0; i < 10; ++i) {}
+    delay_5us();
+    // for (int i = 0; i < 10; ++i) {}
 }
 
 static void config(uint8_t config)
@@ -206,8 +209,7 @@ static int32_t read_only()
     send_clk();
     send_clk();
     send_clk();
-    return 0;
-    // return parse_adc(read);
+    return parse_adc(read);
 }
 
 static void push_to_buffer(int32_t value)
@@ -242,7 +244,6 @@ static void gpio_adc_loop()
         xSemaphoreTake( dataReadtSem, portMAX_DELAY );
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
-
 /*
         if (!configed) {
             config(channel_config);
