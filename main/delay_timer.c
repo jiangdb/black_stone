@@ -51,7 +51,7 @@ void IRAM_ATTR delay_timer_isr(void *para)
 void delay_5us()
 {
     printf("==============> delay 5 us!!!\n");
-
+    timer_set_counter_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, 0x00000000ULL);
     timer_start(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX);
     xSemaphoreTake( semDelay5Us, portMAX_DELAY );
     printf("==============> after delay 5 us!!!\n");
