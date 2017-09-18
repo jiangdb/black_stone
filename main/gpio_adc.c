@@ -260,6 +260,7 @@ static void gpio_adc_loop()
         v = read_only();
         push_to_buffer(v);
 
+        xSemaphoreGive( xMutexRead );
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable data int
