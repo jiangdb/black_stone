@@ -202,6 +202,10 @@ void app_main()
     /* Initialise bluetooth */
     // bt_init();
 
+    /* Initialise timer */
+    bs_timer_init();
+    delay_timer_init();
+
     /* Initialise adc */
     spi_adc_init();
     gpio_adc_init();
@@ -212,9 +216,7 @@ void app_main()
     /* Initialise key */
     gpio_key_init();
 
-    /* Initialise timer */
-    bs_timer_init();
-    delay_timer_init();
+
 
     printf("working mode :%s!!!\n", working_mode == WORKING_MODE_NORMAL? "normal":"calibration");
 
