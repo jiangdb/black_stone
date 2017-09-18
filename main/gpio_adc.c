@@ -123,11 +123,11 @@ static int32_t parse_adc(int32_t adcValue)
 static void send_clk()
 {
     gpio_set_level(GPIO_PIN_NUM_CLK, 1);
-    delay_5us();
-    // for (int i = 0; i < 10; ++i) {}
+    // delay_5us();
+    for (int i = 0; i < 10; ++i) {}
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
-    delay_5us();
-    // for (int i = 0; i < 10; ++i) {}
+    // delay_5us();
+    for (int i = 0; i < 10; ++i) {}
 }
 
 static void config(uint8_t config)
