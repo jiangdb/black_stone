@@ -41,6 +41,7 @@ void IRAM_ATTR delay_timer_isr(void *para)
         TIMERG1.hw_timer[timer_idx].update = 1;
         /*We don't call a API here because they are not declared with IRAM_ATTR*/
         TIMERG1.int_clr_timers.t0 = 1;
+        TIMERG1.hw_timer[timer_idx].config.alarm_en = 1;
         // release semaphore
         BaseType_t mustYield=false;
         xSemaphoreGiveFromISR(semDelay5Us, &mustYield);
@@ -50,13 +51,10 @@ void IRAM_ATTR delay_timer_isr(void *para)
 
 void delay_5us()
 {
-    printf("==============> delay 5 us!!!\n");
     timer_set_counter_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, 0x00000000ULL);
     timer_start(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX);
     xSemaphoreTake( semDelay5Us, portMAX_DELAY );
-    printf("==============> after delay 5 us!!!\n");
 }
-
 
 void delay_timer_stop()
 {
@@ -84,6 +82,8 @@ void delay_timer_init()
     timer_set_counter_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, 0x00000000ULL);
     /*Set alarm value*/
     timer_set_alarm_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, TIMER_INTERVAL_5_US);
+    // timer_set_alarm_value(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX, 2*TIMER_SCALE);
+
     /*Enable timer interrupt*/
     timer_enable_intr(DELAY_TIMER_GROUP, DELAY_TIMER_INDEX);
     /*Set ISR handler*/

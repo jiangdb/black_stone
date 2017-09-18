@@ -73,7 +73,7 @@ static void gpio_key_task(void* arg)
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
-            printf("gpio_key(%d): %d !!!\n", io_num, val);
+            // printf("gpio_key(%d): %d !!!\n", io_num, val);
             if (io_num == GPIO_INPUT_IO_STATE1 || io_num == GPIO_INPUT_IO_STATE2 ) {
                 //got charging status change
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
