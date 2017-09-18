@@ -52,6 +52,8 @@
 
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
+extern SemaphoreHandle_t xMutexRead;
+
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t dataReadtSem = NULL;
 static uint32_t lastDataReadyTime;
@@ -205,9 +207,6 @@ static int32_t read_only()
         if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
             read |=1 ;
         }
-        if (i%5==0 && i>0) {
-            portYIELD();
-        }
     }
     send_clk();
     send_clk();
@@ -245,6 +244,7 @@ static void gpio_adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( dataReadtSem, portMAX_DELAY );
+        xSemaphoreTake( xMutexRead, portMAX_DELAY);
         printf("%s: Got data!!!\n", TAG);
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
