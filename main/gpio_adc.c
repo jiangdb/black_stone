@@ -199,20 +199,20 @@ static void config(uint8_t config)
 
 static int32_t read_only()
 {
-    // int32_t read = 0;
+    int32_t read = 0;
     for (int i = 0; i < 24; ++i)
     {
-        // read <<= 1;
+        read <<= 1;
         send_clk();
-        // if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
-            // read |=1 ;
-        // }
+        if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
+            read |=1 ;
+        }
     }
     send_clk();
     send_clk();
     send_clk();
-    return 0;
-    // return parse_adc(read);
+    // return 0;
+    return parse_adc(read);
 }
 
 static void push_to_buffer(int32_t value)
@@ -258,8 +258,8 @@ static void gpio_adc_loop()
             push_to_buffer(v);
         }
         */
-        // v = read_only();
-        // push_to_buffer(v);
+        v = read_only();
+        push_to_buffer(v);
 
         // xSemaphoreGive( xMutexRead );
         vTaskDelay(10/portTICK_RATE_MS);
@@ -329,6 +329,7 @@ void gpio_adc_init()
         .pin_bit_mask=(1<<GPIO_PIN_NUM_CLK)
     };
     gpio_config(&clk_conf);
+    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
 
     //GPIO config for the data line.
     gpio_config_t data_conf={
@@ -341,7 +342,7 @@ void gpio_adc_init()
     //Set up handshake line interrupt.
     gpio_config(&data_conf);
 
-/*
+    /*
     //disable interrupt
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     //set as output mode
@@ -354,13 +355,12 @@ void gpio_adc_init()
     io_conf.pull_up_en = 0;
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
     */
 
     // gpio_install_isr_service(0);
-    // gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
+    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
 
     //Create task
-    // xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
+    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
 }
 
