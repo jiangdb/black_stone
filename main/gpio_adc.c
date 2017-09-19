@@ -258,7 +258,7 @@ static void gpio_adc_loop()
             push_to_buffer(v);
         }
         */
-        v = read_only();
+        // v = read_only();
         // push_to_buffer(v);
 
         // xSemaphoreGive( xMutexRead );
