@@ -55,7 +55,7 @@ static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH
 extern SemaphoreHandle_t xMutexRead;
 
 //The semaphore indicating the data is ready.
-static SemaphoreHandle_t dataReadtSem = NULL;
+static SemaphoreHandle_t dataReadySem = NULL;
 static uint32_t lastDataReadyTime;
 static bool calibration_enable = false;
 static TaskHandle_t xReaderTaskHandle = NULL;
@@ -83,7 +83,7 @@ static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
-    xSemaphoreGiveFromISR(dataReadtSem, &mustYield);
+    xSemaphoreGiveFromISR(dataReadySem, &mustYield);
     if (mustYield) portYIELD_FROM_ISR();
 }
 
@@ -244,7 +244,7 @@ static void gpio_adc_loop()
     // bool configed = false;
     while(1) {
         //Wait until data is ready
-        xSemaphoreTake( dataReadtSem, portMAX_DELAY );
+        xSemaphoreTake( dataReadySem, portMAX_DELAY );
         // xSemaphoreTake( xMutexRead, portMAX_DELAY);
         // printf("%s: Got data!!!\n", TAG);
         //Disable data int
@@ -304,11 +304,10 @@ void gpio_adc_shutdown()
 
 void gpio_adc_init()
 {
-    /*
     printf("%s: CS1237 start!!!\n", TAG);
 
     //Create the semaphore.
-    dataReadtSem=xSemaphoreCreateBinary();
+    dataReadySem=xSemaphoreCreateBinary();
 
 #if USE_QUEUE_BUFFER
     // Queue Buffer init
@@ -347,10 +346,9 @@ void gpio_adc_init()
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
 
     // gpio_install_isr_service(0);
-    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
+    // gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
 
     //Create task
-    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
-    */
+    // xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
 }
 
