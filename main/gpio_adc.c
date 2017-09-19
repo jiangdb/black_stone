@@ -304,6 +304,7 @@ void gpio_adc_shutdown()
 
 void gpio_adc_init()
 {
+    /*
     printf("%s: CS1237 start!!!\n", TAG);
 
     //Create the semaphore.
@@ -350,5 +351,6 @@ void gpio_adc_init()
 
     //Create task
     xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
+    */
 }
 

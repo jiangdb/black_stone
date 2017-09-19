@@ -187,7 +187,7 @@ static int32_t read_only()
 
 static void push_to_buffer(int32_t value)
 {
-#if USE_QUEUE_BUFFER     
+#if USE_QUEUE_BUFFER
     queue_buffer_t *pBuffer;
     if (calibration_enable) {
         pBuffer = &qb_SpiAdcCalibration;
