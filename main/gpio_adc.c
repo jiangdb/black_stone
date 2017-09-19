@@ -320,8 +320,18 @@ void gpio_adc_init()
 
     //GPIO config
     printf("%s: gpio_init !!!\n", TAG);
+
+    gpio_config_t clk_conf={
+        .intr_type=GPIO_PIN_INTR_DISABLE,
+        .mode=GPIO_MODE_OUTPUT,
+        .pull_down_en=0,
+        .pull_up_en=0,
+        .pin_bit_mask=(1<<GPIO_PIN_NUM_CLK)
+    };
+    gpio_config(&clk_conf);
+
     //GPIO config for the data line.
-    gpio_config_t io_conf={
+    gpio_config_t data_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
         .pull_down_en=1,
@@ -329,8 +339,9 @@ void gpio_adc_init()
     };
 
     //Set up handshake line interrupt.
-    gpio_config(&io_conf);
+    gpio_config(&data_conf);
 
+/*
     //disable interrupt
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     //set as output mode
@@ -344,6 +355,7 @@ void gpio_adc_init()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
+    */
 
     // gpio_install_isr_service(0);
     // gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
