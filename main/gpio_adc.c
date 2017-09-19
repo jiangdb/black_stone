@@ -26,7 +26,7 @@
 #define PRECISION             6
 
 #define GPIO_PIN_NUM_DATA     13
-#define GPIO_PIN_NUM_CLK      5
+#define GPIO_PIN_NUM_CLK      0
 
 #define REFO_ON               0x0<<6
 #define REFO_OFF              0x1<<6
