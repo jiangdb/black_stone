@@ -331,7 +331,6 @@ void gpio_adc_init()
     //Set up handshake line interrupt.
     gpio_config(&io_conf);
 
-    /*
     //disable interrupt
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     //set as output mode
@@ -345,7 +344,6 @@ void gpio_adc_init()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_set_level(GPIO_PIN_NUM_CLK, 0);
-    */
 
     // gpio_install_isr_service(0);
     // gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
