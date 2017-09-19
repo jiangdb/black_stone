@@ -199,19 +199,20 @@ static void config(uint8_t config)
 
 static int32_t read_only()
 {
-    int32_t read = 0;
+    // int32_t read = 0;
     for (int i = 0; i < 24; ++i)
     {
-        read <<= 1;
+        // read <<= 1;
         send_clk();
-        if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
-            read |=1 ;
-        }
+        // if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
+            // read |=1 ;
+        // }
     }
     send_clk();
     send_clk();
     send_clk();
-    return parse_adc(read);
+    return 0;
+    // return parse_adc(read);
 }
 
 static void push_to_buffer(int32_t value)
@@ -244,8 +245,8 @@ static void gpio_adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( dataReadtSem, portMAX_DELAY );
-        xSemaphoreTake( xMutexRead, portMAX_DELAY);
-        printf("%s: Got data!!!\n", TAG);
+        // xSemaphoreTake( xMutexRead, portMAX_DELAY);
+        // printf("%s: Got data!!!\n", TAG);
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
 /*
@@ -258,9 +259,9 @@ static void gpio_adc_loop()
         }
         */
         v = read_only();
-        push_to_buffer(v);
+        // push_to_buffer(v);
 
-        xSemaphoreGive( xMutexRead );
+        // xSemaphoreGive( xMutexRead );
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable data int

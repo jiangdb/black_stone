@@ -18,7 +18,6 @@
 #include "driver/gpio.h"
 #include "queue_buffer.h"
 #include "util.h"
-#include "esp_heap_alloc_caps.h"
 
 /*
 */
@@ -57,7 +56,6 @@
 static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 SemaphoreHandle_t xMutexRead = NULL;
-
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
@@ -263,7 +261,7 @@ static void adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
-        xSemaphoreTake( xMutexRead, portMAX_DELAY);
+        // xSemaphoreTake( xMutexRead, portMAX_DELAY);
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
 /*
@@ -278,7 +276,7 @@ static void adc_loop()
         v = read_only();
         push_to_buffer(v);
 
-        xSemaphoreGive( xMutexRead );
+        // xSemaphoreGive( xMutexRead );
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable gpio again and wait for data
@@ -333,7 +331,7 @@ void spi_adc_init()
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
-    xMutexRead = xSemaphoreCreateMutex();
+    // xMutexRead = xSemaphoreCreateMutex();
 
     //SPI config
     spi_init();
