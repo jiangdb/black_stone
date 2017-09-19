@@ -25,7 +25,7 @@
 
 #define PRECISION             6
 
-#define GPIO_PIN_NUM_DATA     13
+#define GPIO_PIN_NUM_DATA     4
 #define GPIO_PIN_NUM_CLK      0
 
 #define REFO_ON               0x0<<6
@@ -246,7 +246,7 @@ static void gpio_adc_loop()
         //Wait until data is ready
         xSemaphoreTake( dataReadySem, portMAX_DELAY );
         // xSemaphoreTake( xMutexRead, portMAX_DELAY);
-        // printf("%s: Got data!!!\n", TAG);
+        printf("%s: Got data!!!\n", TAG);
         //Disable data int
         gpio_intr_disable(GPIO_PIN_NUM_DATA);
 /*
