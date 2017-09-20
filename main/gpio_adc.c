@@ -299,7 +299,7 @@ static void gpio_adc_loop()
             push_to_buffer(ch, v);
 
             // xSemaphoreGive( xMutexRead );
-            // vTaskDelay(10/portTICK_RATE_MS);
+            vTaskDelay(5/portTICK_RATE_MS);
 
             //Enable data int
             if (ch == 0) {
