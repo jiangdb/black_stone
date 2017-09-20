@@ -255,7 +255,7 @@ static void push_to_buffer(int ch, int32_t value)
     if (abs(gpio_adc_value[ch] - value) >=2 ){
         gpio_adc_value[ch] = value;
     }
-    printf("gpio_adc_value[%d]: (int)%d  ", ch, gpio_adc_value[ch]);
+    // printf("gpio_adc_value[%d]: (int)%d\n", ch, gpio_adc_value[ch]);
 #endif
 }
 
