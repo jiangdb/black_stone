@@ -42,10 +42,6 @@ static int32_t last_weight[2] = {0,0};
 static bool done = false;
 static int trigger_sleep_count = 0;
 static int key_repeat_count = 0;
-/*
-static queue_buffer_t* dataQueueBuffer[2] = { &qb_SpiAdcData, &qb_GpioAdcData};
-static queue_buffer_t* calibrationQueueBuffer[2] = { &qb_SpiAdcCalibration, &qb_GpioAdcCalibration};
-*/
 
 static void lock_display(int channel, bool lock)
 {
@@ -146,14 +142,15 @@ void handle_key_event(key_event_t keyEvent)
                         printf("enter calibration mode\n");
                         beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
-                        // spi_adc_calibration(true);
+                        spi_adc_calibration(true);
                         gpio_adc_calibration(true);
                     }else if (key_repeat_count == 0){
                         //set zero
                         int32_t adcValue[2];
-                        // adcValue[0] = spi_adc_get_value();
-                        adcValue[0] = gpio_adc_get_value(0);
-                        adcValue[1] = gpio_adc_get_value(1);
+                        adcValue[0] = spi_adc_get_value();
+                        adcValue[1] = gpio_adc_get_value();
+                        // adcValue[0] = gpio_adc_get_value(0);
+                        // adcValue[1] = gpio_adc_get_value(1);
                         for (int i = 0; i < 2; ++i)
                         {
                             set_zero(i,adcValue[i]);
@@ -208,7 +205,7 @@ void app_main()
     // delay_timer_init();
 
     /* Initialise adc */
-    // spi_adc_init();
+    spi_adc_init();
     gpio_adc_init();
 
     /* Initialise display */
@@ -232,9 +229,10 @@ void app_main()
 
         if (working_mode == WORKING_MODE_NORMAL) {
             int32_t adcValue[2];
-            // adcValue[0] = spi_adc_get_value();
-            adcValue[0] = gpio_adc_get_value(0);
-            adcValue[1] = gpio_adc_get_value(1);
+            adcValue[0] = spi_adc_get_value();
+            adcValue[1] = gpio_adc_get_value();
+            // adcValue[0] = gpio_adc_get_value(0);
+            // adcValue[1] = gpio_adc_get_value(1);
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
@@ -270,9 +268,10 @@ void app_main()
             calibrate_tick++;
             // printf("tick: %d\n", calibrate_tick);
             if (calibrate_tick >= 30) {
-                // int32_t cal1 = spi_adc_get_value();
-                int32_t cal1 = gpio_adc_get_value(0);
-                int32_t cal2 = gpio_adc_get_value(1);
+                int32_t cal1 = spi_adc_get_value();
+                int32_t cal2 = gpio_adc_get_value();
+                // int32_t cal1 = gpio_adc_get_value(0);
+                // int32_t cal2 = gpio_adc_get_value(1);
                 printf("%d: %d\n", cal1, cal2);
                 set_calibration(calibrate_index++, cal1, cal2);
                 beap(0, 200);

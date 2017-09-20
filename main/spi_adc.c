@@ -19,7 +19,6 @@
 #include "queue_buffer.h"
 #include "util.h"
 
-#if 0
 /*
 */
 #define TAG                   "SPI-ADC"
@@ -76,7 +75,7 @@ static int32_t spi_adc_value = 0;
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR gpio_data_isr_handler(void* arg)
+static void IRAM_ATTR data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
@@ -117,29 +116,10 @@ static int32_t parse_adc(uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
-    printf("spi adc value: (int)%d  ", value >> PRECISION );
-    print_bin(value, 3);
-
-    /*
-    //check if we need -1
-    bool need_minus = false;
-    int32_t cur_value = value >> (PRECISION-1);
-    if (cur_value == (pre_value[channel]+1)) {
-        int8_t last_two_digits = (int8_t)(cur_value & 0x3);
-        if (last_two_digits == 0x2 || last_two_digits == 0) {
-            need_minus = true;
-            cur_value--;
-        }
+    if (abs(spi_adc_value - (value >> PRECISION)) >=2 ){
+        printf("spi adc value: (int)%d  ", value >> PRECISION );
+        print_bin(value, 3);
     }
-    pre_value[channel] = cur_value;
-    value = value >> PRECISION;
-    if (need_minus) {
-        value--;
-    }
-    if (channel == 1) {
-        printf("value: %d\n ", value);
-    }
-    */
     value = value >> PRECISION;
     return value;
 }
@@ -249,7 +229,7 @@ static void adc_gpio_init()
     //Set up handshake line interrupt.
     gpio_config(&io_conf);
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
+    gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
 }
 
 static void adc_loop()
@@ -259,6 +239,10 @@ static void adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
+
+        if(gpio_get_level(PIN_NUM_DATA) == 1) {
+            continue;
+        }
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
         /*
@@ -347,4 +331,3 @@ void spi_adc_init()
     //Create task
     xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 2, &xHandle);
 }
-#endif
