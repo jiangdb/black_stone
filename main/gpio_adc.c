@@ -239,6 +239,7 @@ static void push_to_buffer(int ch, int32_t value)
     if (abs(gpio_adc_value[ch] - value) >=2 ){
         gpio_adc_value[ch] = value;
     }
+    printf("gpio_adc_value[%d]: (int)%d  ", ch, gpio_adc_value[ch]);
 #endif
 }
 
@@ -357,7 +358,7 @@ void gpio_adc_init()
     gpio_config_t data_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
-        .pull_down_en=1,
+        .pull_up_en=1,
         .pin_bit_mask=((1<<CH0_PIN_NUM_DATA)|(1<<CH1_PIN_NUM_DATA))
     };
 
