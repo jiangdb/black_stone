@@ -76,7 +76,6 @@ This ISR is called when the data line goes low.
 */
 static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
 {
-    /*
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
@@ -85,15 +84,12 @@ static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
-    xSemaphoreGiveFromISR(dataReadySem, &mustYield);
-    if (mustYield) portYIELD_FROM_ISR();
-    */
-
     uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(data_ready_queue, &gpio_num, NULL);
+    xQueueSendFromISR(data_ready_queue, &gpio_num, &mustYield);
+    if (mustYield) portYIELD_FROM_ISR();
 }
 
-static int32_t parse_adc(int32_t adcValue)
+static int32_t parse_adc(int ch, int32_t adcValue)
 {
     int32_t value = adcValue;
 
@@ -101,7 +97,7 @@ static int32_t parse_adc(int32_t adcValue)
         value = 0xFF000000|adcValue;
     }
 
-    printf("gpio adc value: (int)%d  ", value >> PRECISION );
+    printf("gpio adc[%d] value: (int)%d  ", ch, value >> PRECISION );
     print_bin(value, 3);
 
     /*
@@ -220,7 +216,7 @@ static int32_t read_only(int ch)
     send_clk(ch);
     send_clk(ch);
     send_clk(ch);
-    return parse_adc(read);
+    return parse_adc(ch, read);
 }
 
 static void push_to_buffer(int ch, int32_t value)
@@ -257,12 +253,14 @@ static void gpio_adc_loop()
         //Wait until data is ready
         // xSemaphoreTake( dataReadySem, portMAX_DELAY );
         if(xQueueReceive(data_ready_queue, &io_num, portMAX_DELAY)) {
+            vTaskDelay(1/portTICK_RATE_MS); //wait 1ms before start to read
+
             if (io_num == CH0_PIN_NUM_DATA) {
                 ch = 0;
             }else{
                 ch = 1;
             }
-            printf("%s: Got data on %d!!!\n", TAG, ch);
+            // printf("%s: Got data on %d!!!\n", TAG, ch);
             data_pin = ch == 0? CH0_PIN_NUM_DATA: CH1_PIN_NUM_DATA;
             //Disable data int
             gpio_intr_disable(data_pin);
@@ -282,7 +280,7 @@ static void gpio_adc_loop()
             // vTaskDelay(10/portTICK_RATE_MS);
 
             //Enable data int
-            // lastDataReadyTime=xthal_get_ccount();
+            lastDataReadyTime=xthal_get_ccount();
             gpio_intr_enable(data_pin);
         }
     }
