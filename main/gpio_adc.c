@@ -381,7 +381,7 @@ void gpio_adc_init()
     gpio_config(&io_conf);
     */
 
-    // gpio_install_isr_service(0);
+    gpio_install_isr_service(0);
     gpio_isr_handler_add(CH0_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH0_PIN_NUM_DATA);
     gpio_isr_handler_add(CH1_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH1_PIN_NUM_DATA);
 
