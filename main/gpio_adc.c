@@ -25,8 +25,10 @@
 
 #define PRECISION             6
 
-#define GPIO_PIN_NUM_DATA     4
-#define GPIO_PIN_NUM_CLK      0
+#define CH0_PIN_NUM_DATA      23
+#define CH0_PIN_NUM_CLK       18
+#define CH1_PIN_NUM_DATA      4
+#define CH1_PIN_NUM_CLK       0
 
 #define REFO_ON               0x0<<6
 #define REFO_OFF              0x1<<6
@@ -52,13 +54,12 @@
 
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
-extern SemaphoreHandle_t xMutexRead;
-
+static xQueueHandle data_ready_queue = NULL;
 //The semaphore indicating the data is ready.
-static SemaphoreHandle_t dataReadySem = NULL;
+// static SemaphoreHandle_t dataReadySem = NULL;
 static uint32_t lastDataReadyTime;
-static bool calibration_enable = false;
 static TaskHandle_t xReaderTaskHandle = NULL;
+static bool calibration_enable = false;
 
 #if USE_QUEUE_BUFFER
 static int32_t pre_value = 0;
@@ -67,7 +68,7 @@ static int32_t dataBuffer[BUFFER_SIZE];
 static queue_buffer_t qb_GpioAdcCalibration;
 static int32_t calibrationBuffer[CALIBRATION_BUFFER_SIZE];
 #else
-static int32_t gpio_adc_value = 0;
+static int32_t gpio_adc_value[2] = {0,0};
 #endif
 
 /*
@@ -75,6 +76,7 @@ This ISR is called when the data line goes low.
 */
 static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
 {
+    /*
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
@@ -85,6 +87,10 @@ static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
     BaseType_t mustYield=false;
     xSemaphoreGiveFromISR(dataReadySem, &mustYield);
     if (mustYield) portYIELD_FROM_ISR();
+    */
+
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(data_ready_queue, &gpio_num, NULL);
 }
 
 static int32_t parse_adc(int32_t adcValue)
@@ -122,33 +128,35 @@ static int32_t parse_adc(int32_t adcValue)
     return value;
 }
 
-static void send_clk()
+static void send_clk(int ch)
 {
-    gpio_set_level(GPIO_PIN_NUM_CLK, 1);
+    int clk_pin = ch == 0? CH0_PIN_NUM_CLK: CH1_PIN_NUM_CLK;
+    gpio_set_level(clk_pin, 1);
     // delay_5us();
     for (int i = 0; i < 10; ++i) {}
-    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
+    gpio_set_level(clk_pin, 0);
     // delay_5us();
     for (int i = 0; i < 10; ++i) {}
 }
 
-static void config(uint8_t config)
+static void config(int ch, uint8_t config)
 {
+    int data_pin = ch == 0? CH0_PIN_NUM_DATA: CH1_PIN_NUM_DATA;
     //----------------------------------
     //1 ~ 3：clk1-clk27
     //----------------------------------
     int i; 
     for(i = 0; i < 27; i++)
     {
-        send_clk();
+        send_clk(ch);
     }
 
     //----------------------------------
     //4：clk28-clk29
     //----------------------------------
-    gpio_set_direction(GPIO_PIN_NUM_DATA,GPIO_MODE_OUTPUT);
-    send_clk();
-    send_clk();
+    gpio_set_direction(data_pin,GPIO_MODE_OUTPUT);
+    send_clk(ch);
+    send_clk(ch);
 
     //----------------------------------
     //5：clk30-clk36(发送写命令)
@@ -158,20 +166,20 @@ static void config(uint8_t config)
     {
         if(command & 0x80)              //MSB
         {
-            gpio_set_level(GPIO_PIN_NUM_DATA, 1);
+            gpio_set_level(data_pin, 1);
         }
         else
         {
-            gpio_set_level(GPIO_PIN_NUM_DATA, 0);
+            gpio_set_level(data_pin, 0);
         }
         command = command << 1;
-        send_clk();
+        send_clk(ch);
     }
 
     //----------------------------------
     //6：clk37
     //----------------------------------
-    send_clk();
+    send_clk(ch);
     
     //----------------------------------
     //7：clk38-clk45(写入寄存器)
@@ -180,42 +188,42 @@ static void config(uint8_t config)
     {
         if(config & 0x80)              //MSB
         {
-            gpio_set_level(GPIO_PIN_NUM_DATA, 1);
+            gpio_set_level(data_pin, 1);
         }
         else
         {
-            gpio_set_level(GPIO_PIN_NUM_DATA, 0);
+            gpio_set_level(data_pin, 0);
         }
         config = config << 1;
-        send_clk();
+        send_clk(ch);
     }
         
     //----------------------------------
     //8：clk46
     //----------------------------------    
-    gpio_set_direction(GPIO_PIN_NUM_DATA,GPIO_MODE_INPUT);
-    send_clk();
+    gpio_set_direction(data_pin,GPIO_MODE_INPUT);
+    send_clk(ch);
 }
 
-static int32_t read_only()
+static int32_t read_only(int ch)
 {
+    int data_pin = ch == 0? CH0_PIN_NUM_DATA: CH1_PIN_NUM_DATA;
     int32_t read = 0;
     for (int i = 0; i < 24; ++i)
     {
         read <<= 1;
-        send_clk();
-        if(gpio_get_level(GPIO_PIN_NUM_DATA)) {
+        send_clk(ch);
+        if(gpio_get_level(data_pin)) {
             read |=1 ;
         }
     }
-    send_clk();
-    send_clk();
-    send_clk();
-    // return 0;
+    send_clk(ch);
+    send_clk(ch);
+    send_clk(ch);
     return parse_adc(read);
 }
 
-static void push_to_buffer(int32_t value)
+static void push_to_buffer(int ch, int32_t value)
 {
 #if USE_QUEUE_BUFFER     
     queue_buffer_t *pBuffer;
@@ -232,8 +240,8 @@ static void push_to_buffer(int32_t value)
         queue_buffer_push(pBuffer, pre_value);
     }
 #else
-    if (abs(gpio_adc_value - value) >=2 ){
-        gpio_adc_value = value;
+    if (abs(gpio_adc_value[ch] - value) >=2 ){
+        gpio_adc_value[ch] = value;
     }
 #endif
 }
@@ -241,36 +249,46 @@ static void push_to_buffer(int32_t value)
 static void gpio_adc_loop()
 {
     int32_t v = 0;
+    uint32_t io_num;
+    int ch=0;
+    int data_pin;
     // bool configed = false;
     while(1) {
         //Wait until data is ready
-        xSemaphoreTake( dataReadySem, portMAX_DELAY );
-        // xSemaphoreTake( xMutexRead, portMAX_DELAY);
-        printf("%s: Got data!!!\n", TAG);
-        //Disable data int
-        gpio_intr_disable(GPIO_PIN_NUM_DATA);
-/*
-        if (!configed) {
-            config(channel_config);
-            configed  = true;
-        }else{
-            v = read_only();
-            push_to_buffer(v);
+        // xSemaphoreTake( dataReadySem, portMAX_DELAY );
+        if(xQueueReceive(data_ready_queue, &io_num, portMAX_DELAY)) {
+            if (io_num == CH0_PIN_NUM_DATA) {
+                ch = 0;
+            }else{
+                ch = 1;
+            }
+            printf("%s: Got data on %d!!!\n", TAG, ch);
+            data_pin = ch == 0? CH0_PIN_NUM_DATA: CH1_PIN_NUM_DATA;
+            //Disable data int
+            gpio_intr_disable(data_pin);
+            /*
+            if (!configed) {
+                config(channel_config);
+                configed  = true;
+            }else{
+                v = read_only();
+                push_to_buffer(v);
+            }
+            */
+            v = read_only(ch);
+            push_to_buffer(ch, v);
+
+            // xSemaphoreGive( xMutexRead );
+            // vTaskDelay(10/portTICK_RATE_MS);
+
+            //Enable data int
+            // lastDataReadyTime=xthal_get_ccount();
+            gpio_intr_enable(data_pin);
         }
-        */
-        v = read_only();
-        push_to_buffer(v);
-
-        // xSemaphoreGive( xMutexRead );
-        vTaskDelay(10/portTICK_RATE_MS);
-
-        //Enable data int
-        lastDataReadyTime=xthal_get_ccount();
-        gpio_intr_enable(GPIO_PIN_NUM_DATA);
     }
 }
 
-int32_t gpio_adc_get_value()
+int32_t gpio_adc_get_value(int ch)
 {
     return 0;
 #if USE_QUEUE_BUFFER
@@ -280,7 +298,7 @@ int32_t gpio_adc_get_value()
         return queue_average(qb_GpioAdcData);
     }
 #else
-    return gpio_adc_value;
+    return gpio_adc_value[ch];
 #endif
 }
 
@@ -296,18 +314,23 @@ void gpio_adc_shutdown()
         vTaskDelete( xReaderTaskHandle );
     }
 
-    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
+    gpio_set_level(CH0_PIN_NUM_CLK, 0);
+    gpio_set_level(CH1_PIN_NUM_CLK, 0);
     vTaskDelay(1/portTICK_RATE_MS);
-    gpio_set_level(GPIO_PIN_NUM_CLK, 1);
+    gpio_set_level(CH0_PIN_NUM_CLK, 1);
+    gpio_set_level(CH1_PIN_NUM_CLK, 1);
     vTaskDelay(1/portTICK_RATE_MS);
 }
 
 void gpio_adc_init()
 {
-    printf("%s: CS1237 start!!!\n", TAG);
+    printf("%s: CS1238 start!!!\n", TAG);
 
     //Create the semaphore.
-    dataReadySem=xSemaphoreCreateBinary();
+    // dataReadySem=xSemaphoreCreateBinary();
+
+    //create a queue to handle gpio event from isr
+    data_ready_queue = xQueueCreate(10, sizeof(uint32_t));
 
 #if USE_QUEUE_BUFFER
     // Queue Buffer init
@@ -326,17 +349,18 @@ void gpio_adc_init()
         .mode=GPIO_MODE_OUTPUT,
         .pull_down_en=0,
         .pull_up_en=0,
-        .pin_bit_mask=(1<<GPIO_PIN_NUM_CLK)
+        .pin_bit_mask=((1<<CH0_PIN_NUM_CLK)|(1<<CH1_PIN_NUM_CLK))
     };
     gpio_config(&clk_conf);
-    gpio_set_level(GPIO_PIN_NUM_CLK, 0);
+    gpio_set_level(CH0_PIN_NUM_CLK, 0);
+    gpio_set_level(CH1_PIN_NUM_CLK, 0);
 
     //GPIO config for the data line.
     gpio_config_t data_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
         .pull_down_en=1,
-        .pin_bit_mask=(1<<GPIO_PIN_NUM_DATA)
+        .pin_bit_mask=((1<<CH0_PIN_NUM_DATA)|(1<<CH1_PIN_NUM_DATA))
     };
 
     //Set up handshake line interrupt.
@@ -358,7 +382,8 @@ void gpio_adc_init()
     */
 
     // gpio_install_isr_service(0);
-    gpio_isr_handler_add(GPIO_PIN_NUM_DATA, gpio_adc_data_isr_handler, NULL);
+    gpio_isr_handler_add(CH0_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH0_PIN_NUM_DATA);
+    gpio_isr_handler_add(CH1_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH1_PIN_NUM_DATA);
 
     //Create task
     xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);

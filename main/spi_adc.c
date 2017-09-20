@@ -19,6 +19,7 @@
 #include "queue_buffer.h"
 #include "util.h"
 
+#if 0
 /*
 */
 #define TAG                   "ADC"
@@ -351,3 +352,4 @@ void spi_adc_init()
     //Create task
     xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 5, &xHandle);
 }
+#endif
