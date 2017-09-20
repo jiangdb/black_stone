@@ -57,7 +57,8 @@ static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH
 static xQueueHandle data_ready_queue = NULL;
 //The semaphore indicating the data is ready.
 // static SemaphoreHandle_t dataReadySem = NULL;
-static uint32_t lastDataReadyTime;
+static uint32_t lastDataReadyTime_ch0;
+static uint32_t lastDataReadyTime_ch1;
 static TaskHandle_t xReaderTaskHandle = NULL;
 static bool calibration_enable = false;
 
@@ -74,14 +75,29 @@ static int32_t gpio_adc_value[2] = {0,0};
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR gpio_adc_data_isr_handler(void* arg)
+static void IRAM_ATTR ch0_data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
-    uint32_t diff=currtime-lastDataReadyTime;
+    uint32_t diff=currtime-lastDataReadyTime_ch0;
     if (diff<1200000) return; //ignore everything <5ms after an earlier irq
-    lastDataReadyTime=currtime;
+    lastDataReadyTime_ch0=currtime;
+    //Give the semaphore.
+    BaseType_t mustYield=false;
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(data_ready_queue, &gpio_num, &mustYield);
+    if (mustYield) portYIELD_FROM_ISR();
+}
+
+static void IRAM_ATTR ch1_data_isr_handler(void* arg)
+{
+    //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
+    //looking at the time between interrupts and refusing any interrupt too close to another one.
+    uint32_t currtime=xthal_get_ccount();
+    uint32_t diff=currtime-lastDataReadyTime_ch1;
+    if (diff<1200000) return; //ignore everything <5ms after an earlier irq
+    lastDataReadyTime_ch1=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
     uint32_t gpio_num = (uint32_t) arg;
@@ -281,7 +297,12 @@ static void gpio_adc_loop()
             // vTaskDelay(10/portTICK_RATE_MS);
 
             //Enable data int
-            lastDataReadyTime=xthal_get_ccount();
+            if (ch == 0) {
+                lastDataReadyTime_ch0=xthal_get_ccount();
+            }else{
+                lastDataReadyTime_ch1=xthal_get_ccount();
+            }
+
             gpio_intr_enable(data_pin);
         }
     }
@@ -289,7 +310,6 @@ static void gpio_adc_loop()
 
 int32_t gpio_adc_get_value(int ch)
 {
-    return 0;
 #if USE_QUEUE_BUFFER
     if (calibration_enable) {
         return queue_average(qb_GpioAdcCalibration);
@@ -364,27 +384,11 @@ void gpio_adc_init()
 
     //Set up handshake line interrupt.
     gpio_config(&data_conf);
-
-    /*
-    //disable interrupt
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    //set as output mode
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    //bit mask of the pins that you want to set,e.g.GPIO18/19
-    io_conf.pin_bit_mask = (1<<GPIO_PIN_NUM_CLK);
-    //disable pull-down mode
-    io_conf.pull_down_en = 0;
-    //disable pull-up mode
-    io_conf.pull_up_en = 0;
-    //configure GPIO with the given settings
-    gpio_config(&io_conf);
-    */
-
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(CH0_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH0_PIN_NUM_DATA);
-    gpio_isr_handler_add(CH1_PIN_NUM_DATA, gpio_adc_data_isr_handler, (void*)CH1_PIN_NUM_DATA);
+    gpio_isr_handler_add(CH0_PIN_NUM_DATA, ch0_data_isr_handler, (void*)CH0_PIN_NUM_DATA);
+    gpio_isr_handler_add(CH1_PIN_NUM_DATA, ch1_data_isr_handler, (void*)CH1_PIN_NUM_DATA);
 
     //Create task
-    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 5, &xReaderTaskHandle);
+    xTaskCreate(&gpio_adc_loop, "gpio_adc_task", 4096, NULL, 2, &xReaderTaskHandle);
 }
 

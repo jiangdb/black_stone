@@ -22,7 +22,7 @@
 #if 0
 /*
 */
-#define TAG                   "ADC"
+#define TAG                   "SPI-ADC"
 
 #define PRECISION             6
 
@@ -55,8 +55,6 @@
 #define CALIBRATION_BUFFER_SIZE   10
 
 static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
-
-SemaphoreHandle_t xMutexRead = NULL;
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
@@ -244,14 +242,13 @@ static void adc_gpio_init()
     gpio_config_t io_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
         .mode=GPIO_MODE_INPUT,
-        .pull_down_en=1,
+        .pull_up_en=1,
         .pin_bit_mask=(1<<PIN_NUM_DATA)
     };
 
     //Set up handshake line interrupt.
     gpio_config(&io_conf);
     gpio_install_isr_service(0);
-    //gpio_set_intr_type(PIN_NUM_DATA, GPIO_INTR_NEGEDGE);
     gpio_isr_handler_add(PIN_NUM_DATA, gpio_data_isr_handler, NULL);
 }
 
@@ -262,10 +259,9 @@ static void adc_loop()
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
-        // xSemaphoreTake( xMutexRead, portMAX_DELAY);
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
-/*
+        /*
         if (!configed) {
             config(channel_configs);
             configed  = true;
@@ -332,7 +328,6 @@ void spi_adc_init()
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();
-    // xMutexRead = xSemaphoreCreateMutex();
 
     //SPI config
     spi_init();
@@ -350,6 +345,6 @@ void spi_adc_init()
 #endif
 
     //Create task
-    xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 5, &xHandle);
+    xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 2, &xHandle);
 }
 #endif
