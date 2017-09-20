@@ -264,23 +264,26 @@ static void gpio_adc_loop()
     int32_t v = 0;
     uint32_t io_num;
     int ch=0;
-    int data_pin;
     // bool configed = false;
     while(1) {
         //Wait until data is ready
         // xSemaphoreTake( dataReadySem, portMAX_DELAY );
         if(xQueueReceive(data_ready_queue, &io_num, portMAX_DELAY)) {
-            vTaskDelay(1/portTICK_RATE_MS); //wait 1ms before start to read
-
             if (io_num == CH0_PIN_NUM_DATA) {
                 ch = 0;
             }else{
                 ch = 1;
             }
             // printf("%s: Got data on %d!!!\n", TAG, ch);
-            data_pin = ch == 0? CH0_PIN_NUM_DATA: CH1_PIN_NUM_DATA;
+            if(gpio_get_level(io_num) == 1) {
+                continue;
+            }
+
             //Disable data int
-            gpio_intr_disable(data_pin);
+            gpio_intr_disable(io_num);
+
+            // vTaskDelay(1/portTICK_RATE_MS); //wait 1ms before start to read
+
             /*
             if (!configed) {
                 config(channel_config);
@@ -303,7 +306,7 @@ static void gpio_adc_loop()
                 lastDataReadyTime_ch1=xthal_get_ccount();
             }
 
-            gpio_intr_enable(data_pin);
+            gpio_intr_enable(io_num);
         }
     }
 }
