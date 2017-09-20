@@ -113,8 +113,10 @@ static int32_t parse_adc(int ch, int32_t adcValue)
         value = 0xFF000000|adcValue;
     }
 
-    printf("gpio adc[%d] value: (int)%d  ", ch, value >> PRECISION );
-    print_bin(value, 3);
+    if (abs(gpio_adc_value[ch] - (value >> PRECISION)) >=2 ){
+        printf("gpio adc[%d] value: (int)%d  ", ch, value >> PRECISION );
+        print_bin(value, 3);
+    }
 
     /*
     //check if we need -1
