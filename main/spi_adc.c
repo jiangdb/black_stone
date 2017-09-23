@@ -53,12 +53,16 @@
 #define BUFFER_SIZE               5
 #define CALIBRATION_BUFFER_SIZE   10
 
+#define INT_VALID_INTERVAL      (240000 * 50)   //50ms
+
 static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
+static uint32_t lastIsrTime=0;
+static uint32_t isrInterval=0;
 static bool calibration_enable = false;
 static TaskHandle_t xHandle = NULL;
 
@@ -81,7 +85,9 @@ static void IRAM_ATTR data_isr_handler(void* arg)
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
-    if (diff<1200000) return; //ignore everything <5ms after an earlier irq
+    isrInterval = (currtime - lastIsrTime)/240000;
+    lastIsrTime = currtime;
+    if (diff < INT_VALID_INTERVAL) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
@@ -96,7 +102,7 @@ static void gpio_spi_switch(uint8_t mode)
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
         ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
         assert(ret==ESP_OK);
-        lastDataReadyTime=xthal_get_ccount();
+        //lastDataReadyTime=xthal_get_ccount();
         ret=gpio_intr_enable(PIN_NUM_DATA);
         assert(ret==ESP_OK);
     }else if (mode == DATA_PIN_FUNC_SPI) {
@@ -240,9 +246,13 @@ static void adc_loop()
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
 
+        /*
+        int data_level = gpio_get_level(PIN_NUM_DATA);
+        printf("spi isr interval: %d data level: %d\n",isrInterval, data_level);
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }
+        */
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
         /*
@@ -257,7 +267,6 @@ static void adc_loop()
         v = read_only();
         push_to_buffer(v);
 
-        // xSemaphoreGive( xMutexRead );
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable gpio again and wait for data

@@ -429,11 +429,15 @@ void gpio_adc_init()
 #define BUFFER_SIZE               5
 #define CALIBRATION_BUFFER_SIZE   10
 
+#define INT_VALID_INTERVAL      (240000 * 50)   //50ms
+
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t dataReadySem = NULL;
 static uint32_t lastDataReadyTime;
+static uint32_t lastIsrTime=0;
+static uint32_t isrInterval=0;
 static TaskHandle_t xReaderTaskHandle = NULL;
 static bool calibration_enable = false;
 
@@ -456,7 +460,9 @@ static void IRAM_ATTR data_isr_handler(void* arg)
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
-    if (diff<1200000) return; //ignore everything <5ms after an earlier irq
+    isrInterval = (currtime - lastIsrTime)/240000;
+    lastIsrTime = currtime;
+    if (diff < INT_VALID_INTERVAL) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
@@ -608,15 +614,16 @@ static void gpio_adc_loop()
         //Wait until data is ready
         xSemaphoreTake( dataReadySem, portMAX_DELAY );
 
+        /*
+        int data_level = gpio_get_level(CH1_PIN_NUM_DATA);
+        printf("gpio isr interval: %d data level: %d\n",isrInterval, data_level);
         // printf("%s: Got data on %d!!!\n", TAG, ch);
         if(gpio_get_level(CH1_PIN_NUM_DATA) == 1) {
             continue;
         }
-
+        */
         //Disable data int
         gpio_intr_disable(CH1_PIN_NUM_DATA);
-
-        // vTaskDelay(1/portTICK_RATE_MS); //wait 1ms before start to read
 
         /*
         if (!configed) {
@@ -633,7 +640,7 @@ static void gpio_adc_loop()
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable data int
-        lastDataReadyTime = xthal_get_ccount();
+        //lastDataReadyTime = xthal_get_ccount();
         gpio_intr_enable(CH1_PIN_NUM_DATA);
     }
 }

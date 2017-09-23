@@ -34,7 +34,8 @@ extern void handle_key_event(key_event_t keyEvent);
 #define GPIO_INPUT_IO_KEY_RIGHT      33
 #define GPIO_INPUT_IO_STATE1         35
 #define GPIO_INPUT_IO_STATE2         27
-#define GPIO_INPUT_PIN_SEL  (uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) | ((uint64_t)1<<GPIO_INPUT_IO_STATE1) | ((uint64_t)1<<GPIO_INPUT_IO_STATE2))
+//#define GPIO_INPUT_PIN_SEL  (uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) | ((uint64_t)1<<GPIO_INPUT_IO_STATE1) | ((uint64_t)1<<GPIO_INPUT_IO_STATE2))
+#define GPIO_INPUT_PIN_SEL  (uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT))
 #define ESP_INTR_FLAG_DEFAULT        0
 
 static xQueueHandle gpio_evt_queue = NULL;
@@ -172,8 +173,8 @@ void gpio_key_init()
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_LEFT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_LEFT);
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_RIGHT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_RIGHT);
-    gpio_isr_handler_add(GPIO_INPUT_IO_STATE1, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE1);
-    gpio_isr_handler_add(GPIO_INPUT_IO_STATE2, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE2);
+//    gpio_isr_handler_add(GPIO_INPUT_IO_STATE1, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE1);
+//    gpio_isr_handler_add(GPIO_INPUT_IO_STATE2, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE2);
 
     //set output level
     gpio_set_level(GPIO_OUTPUT_IO_LED0, 1);
