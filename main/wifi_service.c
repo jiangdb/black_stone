@@ -33,6 +33,11 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
+void bs_wifi_stop()
+{
+    esp_wifi_stop();
+}
+
 void bs_wifi_init()
 {
     tcpip_adapter_init();

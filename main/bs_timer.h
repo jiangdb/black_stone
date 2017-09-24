@@ -3,6 +3,11 @@
 
 #include <stdio.h>
 
+enum {
+	TIMER_COUNTDOWN,
+	TIMER_OPERATION
+};
+
 void bs_timer_init();
 void bs_timer_start();
 void bs_timer_pause();

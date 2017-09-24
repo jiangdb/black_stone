@@ -16,6 +16,7 @@
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
 #include "display.h"
+#include "battery.h"
 #include "calibration.h"
 #include "queue_buffer.h"
 
@@ -63,27 +64,26 @@
 #define NUMBER_OFF              0x00
 #define OPT_DASH                0x40
 
-
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
 
 static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
-    NUMBER_1,
-    NUMBER_2,
-    NUMBER_3,
-    NUMBER_4,
-    NUMBER_5,
-    NUMBER_6,
-    NUMBER_7,
-    NUMBER_8,
-    NUMBER_0,
-    NUMBER_0,
-    NUMBER_0|0x80,
-    NUMBER_0,
-    0x7F,
-    0x02,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
 
 static uint8_t numbers[] = {
@@ -108,6 +108,7 @@ static uint8_t battery_levels[] = {
 
 static spi_device_handle_t spi;
 static TaskHandle_t xHandle = NULL;
+static int iChargingCount = 0;
 
 void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
 {
@@ -193,21 +194,9 @@ void setDisplayTime(uint32_t seconds)
 
 void setBatteryLevel(int batteryLevel)
 {
-    switch(batteryLevel) {
-        case BATTERY_LEVEL_EMPTY:
-            display_data[BATTERY_ADDRESS] = battery_levels[0];
-            break;
-        case BATTERY_LEVEL_1:
-            display_data[BATTERY_ADDRESS] = battery_levels[1];
-            break;
-        case BATTERY_LEVEL_2:
-            display_data[BATTERY_ADDRESS] = battery_levels[2];
-            break;
-        case BATTERY_LEVEL_3:
-            display_data[BATTERY_ADDRESS] = battery_levels[3];
-            break;
-        default:
-            break;
+    if (iChargingCount == 0) {
+        if (batteryLevel < BATTERY_LEVEL_EMPTY || batteryLevel > BATTERY_LEVEL_3) return;
+        display_data[BATTERY_ADDRESS] = battery_levels[batteryLevel];
     }
 }
 
@@ -283,26 +272,94 @@ void spi_trassfer_display()
 
 }
 
-void display_shutdown()
+static void clear_display_data()
+{
+    for (int i = 1; i < sizeof(display_data); ++i)
+    {
+        display_data[i] = 0;
+    }
+}
+
+void display_indicate_charge_only()
+{
+    int count = 6;
+    clear_display_data();
+
+    while(count > 0) {
+        if (count%2 == 0) {
+            setBatteryLevel(BATTERY_LEVEL_EMPTY);
+        }else{
+            clear_display_data();
+        }
+
+        spi_trassfer_display();
+        vTaskDelay(300/portTICK_RATE_MS);
+        count--;
+    }
+}
+
+static void increase_battery_level()
+{
+    static int level = BATTERY_LEVEL_EMPTY;
+    display_data[BATTERY_ADDRESS] = battery_levels[level++];
+    if (level > BATTERY_LEVEL_3) {
+        level = BATTERY_LEVEL_EMPTY;
+    }
+}
+
+void display_indicate_charging_only()
+{
+    clear_display_data();
+    increase_battery_level();
+    spi_trassfer_display();
+}
+
+void display_indicate_charging()
+{
+    printf("indicate charging !!!\n");
+    iChargingCount = 1;
+}
+
+void display_disable_charging()
+{
+    printf("disable indicate charging !!!\n");
+    iChargingCount = 0;
+    int level = get_battery_level();
+    setBatteryLevel(level);
+}
+
+void display_loop()
+{
+    while(1) {
+        if (iChargingCount > 0) {
+            if (iChargingCount % 10 == 1) {
+                increase_battery_level();
+            }
+            iChargingCount++;
+        }
+        spi_trassfer_display();
+        vTaskDelay(100/portTICK_RATE_MS);
+    }
+}
+
+void display_start()
+{
+    //reset display time
+    setDisplayTime(0);
+
+    //Create task
+    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
+}
+
+void display_stop()
 {
     if( xHandle != NULL )
     {
         vTaskDelete( xHandle );
     }
 
-    for (int i = 1; i < sizeof(display_data); ++i)
-    {
-        display_data[i] = 0;
-    }
+    clear_display_data();
     spi_trassfer_display();
-}
-
-void display_loop()
-{
-    while(1) {
-        spi_trassfer_display();
-        vTaskDelay(100/portTICK_RATE_MS);
-    }
 }
 
 void display_init()
@@ -331,7 +388,4 @@ void display_init()
     //Attach the LCD to the SPI bus
     ret=spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
     assert(ret==ESP_OK);
-
-    //Create task
-    xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
 }

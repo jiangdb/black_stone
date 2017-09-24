@@ -216,7 +216,8 @@ static void adc_gpio_init()
 
     //Set up handshake line interrupt.
     gpio_config(&io_conf);
-    gpio_install_isr_service(0);
+    // gpio_install_isr_service(0);
+    //gpio_set_intr_type(PIN_NUM_DATA, GPIO_INTR_NEGEDGE);
     gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
 }
 
