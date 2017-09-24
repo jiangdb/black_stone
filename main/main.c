@@ -162,9 +162,12 @@ void handle_key_event(key_event_t keyEvent)
                             work_status = WORK_STATUS_CALIBRATION;
                         }else if (key_repeat_count == 0){
                             //set zero
+                            int32_t adcValue[2];
+                            adcValue[0] = spi_adc_get_value();
+                            adcValue[1] = gpio_adc_get_value();
                             for (int i = 0; i < 2; ++i)
                             {
-                                set_zero(i,queue_average(&dataQueueBuffer[i]));
+                                set_zero(i,adcValue[i]);
                                 setDisplayNumber(i, 0, 0);
                                 // lock_display(i, false);
                             }
@@ -303,6 +306,9 @@ void app_main()
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL) {
+            int32_t adcValue[2];
+            adcValue[0] = spi_adc_get_value();
+            adcValue[1] = gpio_adc_get_value();
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
@@ -357,8 +363,9 @@ void app_main()
 
     printf("quit main loop\n");
 
+    spi_adc_shutdown();
+    gpio_adc_shutdown();
     bs_timer_stop();
-    adc_shutdown();
     // bt_stop();
     // bs_wifi_stop();
     battery_stop();
