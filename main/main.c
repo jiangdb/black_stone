@@ -11,7 +11,6 @@
 #include "bt.h"
 #include "display.h"
 #include "bs_timer.h"
-#include "delay_timer.h"
 #include "queue_buffer.h"
 #include "key_event.h"
 #include "calibration.h"
@@ -142,15 +141,11 @@ void handle_key_event(key_event_t keyEvent)
                         printf("enter calibration mode\n");
                         beap(0, 400);
                         working_mode = WORKING_MODE_CALIBRATION;
-                        spi_adc_calibration(true);
-                        gpio_adc_calibration(true);
                     }else if (key_repeat_count == 0){
                         //set zero
                         int32_t adcValue[2];
                         adcValue[0] = spi_adc_get_value();
                         adcValue[1] = gpio_adc_get_value();
-                        // adcValue[0] = gpio_adc_get_value(0);
-                        // adcValue[1] = gpio_adc_get_value(1);
                         for (int i = 0; i < 2; ++i)
                         {
                             set_zero(i,adcValue[i]);
@@ -187,7 +182,7 @@ void app_main()
     }
 
     /* led */
-    led_on();
+    //led_on();
 
     /* config */
     config_init();
@@ -202,7 +197,6 @@ void app_main()
 
     /* Initialise timer */
     bs_timer_init();
-    // delay_timer_init();
 
     /* Initialise adc */
     spi_adc_init();
@@ -231,8 +225,6 @@ void app_main()
             int32_t adcValue[2];
             adcValue[0] = spi_adc_get_value();
             adcValue[1] = gpio_adc_get_value();
-            // adcValue[0] = gpio_adc_get_value(0);
-            // adcValue[1] = gpio_adc_get_value(1);
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
@@ -249,13 +241,13 @@ void app_main()
                         last_weight[i] = weight;
                     }else{
                         display_lock_count[i]++;
-                        //1s not change, and weight < 0.5g, clear zero
+                        //1s not change, and weight < 1g, clear zero
                         if ( (abs(weight) < 10) && (display_lock_count[i] == 10)) {
                             set_zero(i, adcValue[i]);
                         }
                         //3s not change, lock display
                         if (display_lock_count[i] == 30) {
-                            lock_display(i, true);                            
+                            lock_display(i, true);
                         }
                     }
                 }
@@ -270,8 +262,6 @@ void app_main()
             if (calibrate_tick >= 30) {
                 int32_t cal1 = spi_adc_get_value();
                 int32_t cal2 = gpio_adc_get_value();
-                // int32_t cal1 = gpio_adc_get_value(0);
-                // int32_t cal2 = gpio_adc_get_value(1);
                 printf("%d: %d\n", cal1, cal2);
                 set_calibration(calibrate_index++, cal1, cal2);
                 beap(0, 200);
@@ -280,8 +270,6 @@ void app_main()
                 if (calibrate_index >= CALIBRATION_NUMS) {
                     printf("exist calibration mode\n");
                     working_mode = WORKING_MODE_NORMAL;
-                    // spi_adc_calibration(false);
-                    gpio_adc_calibration(false);
                     calibrate_index = 0;
                     beap(100,400);
                 }

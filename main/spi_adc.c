@@ -49,13 +49,12 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define USE_QUEUE_BUFFER          0
-#define BUFFER_SIZE               5
-#define CALIBRATION_BUFFER_SIZE   10
+#define USE_QUEUE_BUFFER          1
+#define BUFFER_SIZE               4
 
 #define INT_VALID_INTERVAL      (240000 * 50)   //50ms
 
-static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
+static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t rdySem = NULL;
@@ -63,17 +62,11 @@ static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
 static uint32_t lastIsrTime=0;
 static uint32_t isrInterval=0;
-static bool calibration_enable = false;
 static TaskHandle_t xHandle = NULL;
-
+static int32_t spi_adc_value = 0;
 #if USE_QUEUE_BUFFER
-static int32_t pre_value = 0;
 static queue_buffer_t qb_SpiAdcData;
 static int32_t spiDataBuffer[BUFFER_SIZE];
-static queue_buffer_t qb_SpiAdcCalibration;
-static int32_t spiCalibrationBuffer[CALIBRATION_BUFFER_SIZE];
-#else
-static int32_t spi_adc_value = 0;
 #endif
 
 /*
@@ -102,7 +95,6 @@ static void gpio_spi_switch(uint8_t mode)
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
         ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
         assert(ret==ESP_OK);
-        //lastDataReadyTime=xthal_get_ccount();
         ret=gpio_intr_enable(PIN_NUM_DATA);
         assert(ret==ESP_OK);
     }else if (mode == DATA_PIN_FUNC_SPI) {
@@ -122,10 +114,12 @@ static int32_t parse_adc(uint8_t data[4])
         value = data[0]<<16|data[1]<<8|data[2];
     }
 
+    /*
     if (abs(spi_adc_value - (value >> PRECISION)) >=2 ){
         printf("spi adc value: (int)%d  ", value >> PRECISION );
         print_bin(value, 3);
     }
+    */
     value = value >> PRECISION;
     return value;
 }
@@ -173,25 +167,13 @@ static int32_t read_only()
 static void push_to_buffer(int32_t value)
 {
 #if USE_QUEUE_BUFFER
-    queue_buffer_t *pBuffer;
-    if (calibration_enable) {
-        pBuffer = &qb_SpiAdcCalibration;
-    }else{
-        pBuffer = &qb_SpiAdcData;
-    }
-
-    if (abs(pre_value - value) >=2 ){
-        queue_buffer_push(pBuffer, value);
-        pre_value = value;
-    }else{
-        queue_buffer_push(pBuffer, pre_value);
-    }
-#else
+    queue_buffer_push(&qb_SpiAdcData, value);
+    value = queue_get_value(&qb_SpiAdcData, ALG_MEDIAN_VALUE);
+#endif
     if (abs(spi_adc_value - value) >=2 ){
         spi_adc_value = value;
+        printf("spi_adc_value: %d\n", spi_adc_value);
     }
-    // printf("spi_adc_value: %d\n", spi_adc_value);
-#endif
 }
 
 static void spi_init()
@@ -238,10 +220,10 @@ static void adc_gpio_init()
     gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
 }
 
-static void adc_loop()
+static void spi_adc_loop()
 {
     int32_t v = 0;
-    // bool configed = false;
+    bool configed = false;
     while(1) {
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
@@ -255,7 +237,6 @@ static void adc_loop()
         */
         //Disable gpio and enable spi
         gpio_spi_switch(DATA_PIN_FUNC_SPI);
-        /*
         if (!configed) {
             config(channel_configs);
             configed  = true;
@@ -263,9 +244,6 @@ static void adc_loop()
             v = read_only();
             push_to_buffer(v);
         }
-        */
-        v = read_only();
-        push_to_buffer(v);
 
         vTaskDelay(10/portTICK_RATE_MS);
 
@@ -276,20 +254,7 @@ static void adc_loop()
 
 int32_t spi_adc_get_value()
 {
-#if USE_QUEUE_BUFFER
-    if (calibration_enable) {
-        return queue_average(qb_SpiAdcCalibration);
-    }else{
-        return queue_average(qb_SpiAdcData);
-    }
-#else
     return spi_adc_value;
-#endif
-}
-
-void spi_adc_calibration(bool enable)
-{
-    calibration_enable = enable;
 }
 
 void spi_adc_shutdown()
@@ -332,11 +297,8 @@ void spi_adc_init()
     // Queue Buffer init
     memset(spiDataBuffer,0,sizeof(spiDataBuffer));
     queue_buffer_init(&qb_SpiAdcData, spiDataBuffer, BUFFER_SIZE);
-
-    memset(spiCalibrationBuffer,0,sizeof(spiCalibrationBuffer));
-    queue_buffer_init(&qb_SpiAdcCalibration, spiCalibrationBuffer, CALIBRATION_BUFFER_SIZE);
 #endif
 
     //Create task
-    xTaskCreate(&adc_loop, "spi_adc_task", 4096, NULL, 2, &xHandle);
+    xTaskCreate(&spi_adc_loop, "spi_adc_task", 4096, NULL, 2, &xHandle);
 }

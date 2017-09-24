@@ -115,7 +115,7 @@ int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision)
         printf("adc: %d ==> weight: %f\n", adcValue, (float)((adcValue - zero[channel]) * CALIBRATION_WEIGHT )/cal[channel]);
     }
     */
-    int32_t weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
+    int32_t weight = (abs((adcValue - zero[channel])) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     if (weight >= 100000 || weight <= -10000) {
         *precision = 0;
         return (weight+50)/10;
@@ -153,11 +153,11 @@ void set_calibration(int index, int32_t channel0, int32_t channel1)
     if (index == 1) {
         // cal[0] = (calibrations[0][1]-calibrations[0][0])*100/100;
         // cal[1] = (calibrations[1][1]-calibrations[1][0])*100/100;
-        cal[0] = (calibrations[0][1]-calibrations[0][0]);
-        cal[1] = (calibrations[1][1]-calibrations[1][0]);
+        cal[0] = abs(calibrations[0][1]-calibrations[0][0]);
+        cal[1] = abs(calibrations[1][1]-calibrations[1][0]);
         config_write(CONFIG_CHANNEL_0_CALIBRATION, cal[0]);
         config_write(CONFIG_CHANNEL_1_CALIBRATION, cal[1]);
-        printf("calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][0]);
+        printf("calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][1]);
         printf("write cal config: %d, %d\n", cal[0], cal[1]);
     }
 }

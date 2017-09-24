@@ -7,7 +7,7 @@
 
 bool queue_buffer_init(queue_buffer_t* f, int32_t* pBuf, int32_t size)
 {
-	CHECK_NULL(f)
+  CHECK_NULL(f)
   f->head = 0;
   f->full = false;
   f->size = size;
@@ -43,8 +43,7 @@ int32_t queue_last(queue_buffer_t* f)
   }
 }
 
-
-int32_t queue_average(queue_buffer_t* f)
+static int32_t queue_average(queue_buffer_t* f)
 {
   CHECK_NULL(f)
 
@@ -55,8 +54,8 @@ int32_t queue_average(queue_buffer_t* f)
   if (f->full) {
     end = f->size;
   }
-
   if (end == 0) return 0;
+
   int32_t sum=0;
   for ( int i=0; i<end; i++ ) {
     sum+=f->pData[i];
@@ -64,6 +63,45 @@ int32_t queue_average(queue_buffer_t* f)
 
   //rounding
   return (sum*10/end+5)/10;
+}
+
+static int32_t queue_median(queue_buffer_t* f)
+{
+  CHECK_NULL(f)
+
+  // median value must has more than 3 value
+  if (f->size < 3) return 0;
+
+  int32_t end = f->head;
+  if (f->full) {
+    end = f->size;
+  }
+  if (end == 0) return 0;
+  if (end < 3) return 0;
+
+  int32_t sum=0;
+  int32_t max=0;
+  int32_t min=10000000;
+  for ( int i=0; i<end; i++ ) {
+    if (f->pData[i] > max) { max = f->pData[i]; }
+    if (f->pData[i] < min) { min = f->pData[i]; }
+    sum += f->pData[i];
+  }
+
+  sum -= (max + min) ;
+
+  //rounding
+  return sum/(end-2);
+}
+
+int32_t queue_get_value(queue_buffer_t* pqueue, algorithm_e algorithm)
+{
+    if (algorithm == ALG_MEAN_VALUE) {
+        return queue_average(pqueue);
+    } else if (algorithm == ALG_MEDIAN_VALUE) {
+        return queue_median(pqueue);
+    }
+    return 0;
 }
 
 void queue_dump(queue_buffer_t* f)
@@ -91,15 +129,18 @@ void queue_dump(queue_buffer_t* f)
 void queue_test()
 {
     queue_buffer_t qbuffer;
-    int32_t dataBuffer[3];
+    int32_t dataBuffer[4];
 
     // Queue Buffer init
     memset(dataBuffer,0,sizeof(dataBuffer));
-    queue_buffer_init(&qbuffer, dataBuffer, 3);
+    queue_buffer_init(&qbuffer, dataBuffer, 4);
 
-    queue_buffer_push(&qbuffer, 2);
-    queue_buffer_push(&qbuffer, 1);
-    queue_buffer_push(&qbuffer, 1);
+    queue_buffer_push(&qbuffer, 803);
+    queue_buffer_push(&qbuffer, 804);
+    queue_buffer_push(&qbuffer, 804);
+    queue_buffer_push(&qbuffer, 804);
 
-    printf("QUEUE BUFFER: %d !!!\n", queue_average(&qbuffer));
+    queue_dump(&qbuffer);
+    printf("median value: %d !!!\n", queue_median(&qbuffer));
+    while(1) {}
 }
