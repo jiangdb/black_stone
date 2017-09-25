@@ -171,7 +171,7 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_SpiAdcData, value);
     value = queue_get_value(&qb_SpiAdcData, ALG_MEDIAN_VALUE);
 #endif
-    if (abs(spi_adc_value - value) >=3 ){
+    if (abs(spi_adc_value - value) >=3 ) {
         spi_adc_value = value;
         printf("spi_adc_value: %d\n", spi_adc_value);
     }

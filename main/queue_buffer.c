@@ -80,7 +80,7 @@ static int32_t queue_median(queue_buffer_t* f)
   if (end < 3) return 0;
 
   int32_t sum=0;
-  int32_t max=0;
+  int32_t max=-10000000;
   int32_t min=10000000;
   for ( int i=0; i<end; i++ ) {
     if (f->pData[i] > max) { max = f->pData[i]; }
