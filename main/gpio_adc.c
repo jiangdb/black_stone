@@ -51,7 +51,7 @@
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
 #define INT_VALID_INTERVAL_40HZ      (240000 * 15)   //15ms for 40HZ
 
-static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_A);
+static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH_SEL_A);
 
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t dataReadySem = NULL;
