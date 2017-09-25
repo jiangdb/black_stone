@@ -24,8 +24,8 @@
 
 #define PRECISION             6
 
-#define PIN_NUM_DATA      4
-#define PIN_NUM_CLK       0
+#define PIN_NUM_DATA          4
+#define PIN_NUM_CLK           0
 
 #define REFO_ON               0x0<<6
 #define REFO_OFF              0x1<<6
@@ -48,7 +48,8 @@
 #define USE_QUEUE_BUFFER          1
 #define BUFFER_SIZE               4
 
-#define INT_VALID_INTERVAL      (240000 * 50)   //50ms
+#define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
+#define INT_VALID_INTERVAL_40HZ      (240000 * 15)   //15ms for 40HZ
 
 static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_128|CH_SEL_A);
 
@@ -75,7 +76,7 @@ static void IRAM_ATTR data_isr_handler(void* arg)
     uint32_t diff=currtime-lastDataReadyTime;
     isrInterval = (currtime - lastIsrTime)/240000;
     lastIsrTime = currtime;
-    if (diff < INT_VALID_INTERVAL) return; //ignore everything between valid interval
+    if (diff < INT_VALID_INTERVAL_40HZ) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
     BaseType_t mustYield=false;
@@ -200,7 +201,7 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_GpioAdcData, value);
     value = queue_get_value(&qb_GpioAdcData, ALG_MEDIAN_VALUE);
 #endif
-    if (abs(gpio_adc_value - value) >=2 ){
+    if (abs(gpio_adc_value - value) >=3 ){
         gpio_adc_value = value;
         printf("gpio_adc_value: %d\n", gpio_adc_value);
     }

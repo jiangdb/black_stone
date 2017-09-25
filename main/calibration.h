@@ -5,9 +5,10 @@
 
 #define CALIBRATION_NUMS 2
 
-int32_t get_weight(int32_t adcValue, int8_t channel, int8_t *precision);
+void calibration_init();
+int32_t convert_weight(int32_t adcValue, int8_t channel, int8_t *precision);
 void set_zero(int channel, int32_t adcValue);
-void get_zero();
-void get_calibrations();
+int32_t get_zero(int channel);
+int get_zero_offset(int channel, int32_t adcValue);
 
 #endif  /*_CALIBRATION_H_*/

@@ -16,7 +16,8 @@
 #define GPIO_INPUT_IO_KEY_RIGHT      33
 #define GPIO_INPUT_IO_STATE1         35
 #define GPIO_INPUT_IO_STATE2         27
-#define GPIO_INPUT_PIN_SEL  		(uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) | ((uint64_t)1<<GPIO_INPUT_IO_STATE1) | ((uint64_t)1<<GPIO_INPUT_IO_STATE2))
+//#define GPIO_INPUT_PIN_SEL  		(uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) | ((uint64_t)1<<GPIO_INPUT_IO_STATE1) | ((uint64_t)1<<GPIO_INPUT_IO_STATE2))
+#define GPIO_INPUT_PIN_SEL  		(uint64_t)(((uint64_t)1<<GPIO_INPUT_IO_KEY_LEFT) | ((uint64_t)1<<GPIO_INPUT_IO_KEY_RIGHT) )
 #define ESP_INTR_FLAG_DEFAULT        0
 
 void gpio_key_init();

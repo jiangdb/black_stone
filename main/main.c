@@ -19,6 +19,7 @@
 #include "spi_adc.h"
 #include "gpio_adc.h"
 #include "config.h"
+#include "zero_track.h"
 
 #define GPIO_LED_IO                 19
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
@@ -127,6 +128,7 @@ static int count_key_repeat ()
 
 void handle_key_event(key_event_t keyEvent)
 {
+    printf("%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
     switch(work_status) {
         case WORK_STATUS_CHARGING_SLEEP:
             if (keyEvent.key_type == NOT_CHARGE_KEY) {
@@ -138,7 +140,6 @@ void handle_key_event(key_event_t keyEvent)
             }
             break;
         case WORK_STATUS_NORMAL:
-            printf("%s: handle key evnet(%d, %d) !!!\n", TAG, keyEvent.key_type, keyEvent.key_value);
             switch(keyEvent.key_type){
                 case TIMER_KEY:
                     if (keyEvent.key_value == KEY_DOWN) {
@@ -169,7 +170,6 @@ void handle_key_event(key_event_t keyEvent)
                             {
                                 set_zero(i,adcValue[i]);
                                 setDisplayNumber(i, 0, 0);
-                                // lock_display(i, false);
                             }
                         }
                     } else if (keyEvent.key_value == KEY_HOLD) {
@@ -177,7 +177,6 @@ void handle_key_event(key_event_t keyEvent)
                     }
                     break;
                 case SLEEP_KEY:
-                    // enter_sleep();
                     done = true;
                     break;
                 case CHARGE_KEY:
@@ -191,7 +190,6 @@ void handle_key_event(key_event_t keyEvent)
             }
             break;
         case WORK_STATUS_CALIBRATION:
-            printf("%s: handle key evnet(%d, %d) !!!\n", TAG, keyEvent.key_type, keyEvent.key_value);
             if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
                 calibrate_tick = 0;
             }
@@ -266,9 +264,6 @@ void app_main()
     /* led */
     // led_on();
 
-    /* start display */
-    display_start();
-
     /* start battery */
     battery_start();
 
@@ -277,8 +272,11 @@ void app_main()
 
     /* config */
     config_init();
-    get_zero();
-    get_calibrations();
+    calibration_init();
+
+    /* Initialise adc */
+    spi_adc_init();
+    gpio_adc_init();
 
     /* Initialise wifi */
     // bs_wifi_init();
@@ -286,16 +284,12 @@ void app_main()
     /* Initialise bluetooth */
     // bt_init();
 
-    /* Initialise timer */
-    bs_timer_init();
-
-    /* Initialise adc */
-    spi_adc_init();
-    gpio_adc_init();
 
     /* Initialise timer */
     bs_timer_init();
 
+    /* start display */
+    display_start();
     if (is_charging()) {
         display_indicate_charging();    
     }
@@ -312,7 +306,10 @@ void app_main()
             for (int i = 0; i < 2; ++i)
             {
                 int8_t precision = 0;
-                int32_t weight = get_weight(adcValue[i], i, &precision);
+                int32_t weight = convert_weight(adcValue[i], i, &precision);
+
+                // auto track zero
+                bool tracked = zero_track(i, adcValue[i], weight, 100);
 
                 // change more than 1.5g, unlock display
                 if (display_lock[i] && (abs(last_weight[i]-weight) > DISPLAY_LOCK_THRESHOLD)) {
@@ -325,17 +322,17 @@ void app_main()
                         last_weight[i] = weight;
                     }else{
                         display_lock_count[i]++;
-                        //1s not change, and weight < 1g, clear zero
-                        if ( (abs(weight) < 10) && (display_lock_count[i] == 10)) {
-                            set_zero(i, adcValue[i]);
-                        }
                         //3s not change, lock display
                         if (display_lock_count[i] == 30) {
                             lock_display(i, true);
                         }
                     }
                 }
-                if (!display_lock[i]) {
+                if (display_lock[i]) {
+                    if (tracked) {
+                        setDisplayNumber(i, 0, 0);
+                    }
+                } else {
                     if (weight >10000 || weight<-1000) weight/=10;
                     setDisplayNumber(i==0?1:0 , weight, precision);
                 }
@@ -363,13 +360,13 @@ void app_main()
 
     printf("quit main loop\n");
 
+    display_stop();
     spi_adc_shutdown();
     gpio_adc_shutdown();
     bs_timer_stop();
     // bt_stop();
     // bs_wifi_stop();
     battery_stop();
-    display_stop();
     if (is_charging()) {
         esp_restart();
     }else{
