@@ -84,8 +84,12 @@ void set_calibration(int index, int32_t channel0, int32_t channel1)
         printf("calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][1]);
         printf("write cal config: %d, %d\n", cal[0], cal[1]);
 
-        precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];
-        precision[1] = (CALIBRATION_WEIGHT * 1000) / cal[1];
+        if (cal[0] != 0 ) {
+            precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];
+        }
+        if (cal[1] != 0 ) {
+            precision[1] = (CALIBRATION_WEIGHT * 1000) / cal[1];
+        }
     }
 }
 
@@ -99,6 +103,10 @@ void calibration_init()
     cal[1] = config_read(CONFIG_CHANNEL_1_CALIBRATION, 10000);
     printf("get cal: %d, %d\n", cal[0], cal[1]);
 
-    precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];
-    precision[1] = (CALIBRATION_WEIGHT * 1000) / cal[1];
+    if (cal[0] != 0 ) {
+        precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];
+    }
+    if (cal[1] != 0 ) {
+        precision[1] = (CALIBRATION_WEIGHT * 1000) / cal[1];
+    }
 }
