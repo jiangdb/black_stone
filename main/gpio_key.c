@@ -53,7 +53,6 @@ static void beap_vibrate()
 
 bool is_charging()
 {
-    return true;
     int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
     int state2 = gpio_get_level(GPIO_INPUT_IO_STATE2);
 
