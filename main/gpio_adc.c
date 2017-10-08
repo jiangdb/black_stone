@@ -203,7 +203,7 @@ static void push_to_buffer(int32_t value)
 #endif
     if (abs(gpio_adc_value - value) >=3 ) {
         gpio_adc_value = value;
-        printf("gpio_adc_value: %d\n", gpio_adc_value);
+        //printf("gpio_adc_value: %d\n", gpio_adc_value);
     }
 }
 

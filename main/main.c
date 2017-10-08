@@ -11,6 +11,7 @@
 #include "bt.h"
 #include "battery.h"
 #include "display.h"
+#include "gatts_service.h"
 #include "bs_timer.h"
 #include "queue_buffer.h"
 #include "key.h"
@@ -33,11 +34,8 @@ enum {
     WORK_STATUS_CALIBRATION
 };
 
-extern void bt_init();
-extern void bt_stop();
 extern void bs_wifi_init();
 extern void bs_wifi_stop();
-extern void set_calibration(int index, int32_t channel0, int32_t channel1);
 
 static const char *TAG = "black_stone";
 static int calibrate_tick = -1;
@@ -170,6 +168,7 @@ void handle_key_event(key_event_t keyEvent)
                             {
                                 set_zero(i,adcValue[i]);
                                 setDisplayNumber(i, 0, 0);
+                                ble_send_notification(i, 0, 0);
                             }
                         }
                     } else if (keyEvent.key_value == KEY_HOLD) {
@@ -282,7 +281,7 @@ void app_main()
     // bs_wifi_init();
 
     /* Initialise bluetooth */
-    // bt_init();
+    bt_init();
 
 
     /* Initialise timer */
@@ -331,10 +330,12 @@ void app_main()
                 if (display_lock[i]) {
                     if (tracked) {
                         setDisplayNumber(i, 0, 0);
+                        ble_send_notification(i, 0, 0);
                     }
                 } else {
                     if (weight >10000 || weight<-1000) weight/=10;
                     setDisplayNumber(i==0?1:0 , weight, precision);
+                    ble_send_notification(i==0?1:0 , weight, precision);
                 }
             }
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
@@ -364,7 +365,7 @@ void app_main()
     spi_adc_shutdown();
     gpio_adc_shutdown();
     bs_timer_stop();
-    // bt_stop();
+    bt_stop();
     // bs_wifi_stop();
     battery_stop();
     if (is_charging()) {
