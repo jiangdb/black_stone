@@ -44,7 +44,7 @@ static void gatts_weight_profile_event_handler(esp_gatts_cb_event_t event, esp_g
 #define GATTS_WEIGHT_SERVICE_UUID               0x181D
 #define GATTS_CHAR_WEIGHT_MEASUREMENT_UUID      0x2A9D
 #define GATTS_CHAR_WEIGHT_SCALE_FEATURE_UUID    0x2A9E
-#define GATTS_WEIGHT_SERVICE_NUM_HANDLE         5           //4 can hole 1 Char, 5 hold 2
+#define GATTS_WEIGHT_SERVICE_NUM_HANDLE         6           //4 can hole 1 Char, 5 hold 2
 
 #define TEST_MANUFACTURER_DATA_LEN  17
 
@@ -363,17 +363,16 @@ static void gatts_weight_profile_event_handler(esp_gatts_cb_event_t event, esp_g
 
         esp_ble_gatts_start_service(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle);
 
+        esp_ble_gatts_add_char(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle, &(gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_uuid[CHAR_WEIGHT_SCALE_FEATURE_ID]),
+                               ESP_GATT_PERM_READ,
+                               ESP_GATT_CHAR_PROP_BIT_READ, 
+                               &char_weight_scale_feature_val, NULL);
+
         esp_ble_gatts_add_char(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle, &(gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_uuid[CHAR_WEIGHT_MEASUREMENT_ID]),
                                ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
                                ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY, 
-                               &char_weight_measurement_val, NULL);
-
-        /*
-        esp_ble_gatts_add_char(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle, &(gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_uuid[CHAR_WEIGHT_SCALE_FEATURE_ID]),
-                               ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-                               ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY, 
-                               &char_weight_scale_feature_val, NULL);
-                               */
+                               NULL, NULL);
+                               //&char_weight_measurement_val, NULL);
         break;
     case ESP_GATTS_ADD_INCL_SRVC_EVT:
         break;
@@ -389,24 +388,24 @@ static void gatts_weight_profile_event_handler(esp_gatts_cb_event_t event, esp_g
 
         if (param->add_char.char_uuid.uuid.uuid16 == GATTS_CHAR_WEIGHT_MEASUREMENT_UUID) {
             gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_MEASUREMENT_ID] = param->add_char.attr_handle;
+
+            ESP_LOGI(GATTS_TAG, "weight measurement handles %d\n", gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_MEASUREMENT_ID]);
         }else if (param->add_char.char_uuid.uuid.uuid16 == GATTS_CHAR_WEIGHT_SCALE_FEATURE_UUID) {
             gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_SCALE_FEATURE_ID] = param->add_char.attr_handle;
+            esp_ble_gatts_get_attr_value(param->add_char.attr_handle,  &length, &prf_char);
+            ESP_LOGI(GATTS_TAG, "weight scale handles %d\n", gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_SCALE_FEATURE_ID]);
+            ESP_LOGI(GATTS_TAG, "the gatts char length = %x\n", length);
+            for(int i = 0; i < length; i++){
+                ESP_LOGI(GATTS_TAG, "prf_char[%x] =%x\n",i,prf_char[i]);
+            }
         }
-        ESP_LOGI(GATTS_TAG, "handles %d, %d\n", 
-                gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_MEASUREMENT_ID],
-                gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_SCALE_FEATURE_ID]
-                );
 
-        gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;
-        gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-        esp_ble_gatts_get_attr_value(param->add_char.attr_handle,  &length, &prf_char);
-
-        ESP_LOGI(GATTS_TAG, "the gatts char length = %x\n", length);
-        for(int i = 0; i < length; i++){
-            ESP_LOGI(GATTS_TAG, "prf_char[%x] =%x\n",i,prf_char[i]);
-        }
-        esp_ble_gatts_add_char_descr(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle, &gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid,
+        if (param->add_char.char_uuid.uuid.uuid16 == GATTS_CHAR_WEIGHT_MEASUREMENT_UUID) {
+            gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
+            esp_ble_gatts_add_char_descr(gl_profile_tab[PROFILE_WEIGHT_APP_ID].service_handle, &gl_profile_tab[PROFILE_WEIGHT_APP_ID].descr_uuid,
                                      ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE, NULL, NULL);
+        }
         break;
     }
     case ESP_GATTS_ADD_CHAR_DESCR_EVT:
@@ -483,6 +482,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 void ble_send_notification(uint8_t displayNum, int32_t value, int8_t precision)
 {
+#if 0
     ESP_LOGI(GATTS_TAG, "%s(%d, %d, %d)", __func__, displayNum, value, precision);
 
     uint8_t buffer[5];
@@ -515,6 +515,7 @@ void ble_send_notification(uint8_t displayNum, int32_t value, int8_t precision)
             gl_profile_tab[PROFILE_WEIGHT_APP_ID].conn_id,
             gl_profile_tab[PROFILE_WEIGHT_APP_ID].weight_service_char_handle[CHAR_WEIGHT_MEASUREMENT_ID],
             sizeof(buffer), buffer, false);
+#endif
 }
 
 void bt_stop()
