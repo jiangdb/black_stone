@@ -20,7 +20,7 @@ void display_indicate_charge_only();
 void display_indicate_charging_only();
 void display_indicate_charging();
 void display_disable_charging();
-void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision);
+void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(bool wifi, bool sound);

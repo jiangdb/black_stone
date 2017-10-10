@@ -167,8 +167,8 @@ void handle_key_event(key_event_t keyEvent)
                             for (int i = 0; i < 2; ++i)
                             {
                                 set_zero(i,adcValue[i]);
-                                setDisplayNumber(i, 0, 0);
-                                ble_send_notification(i, 0, 0);
+                                setDisplayNumber(i, 0);
+                                bt_set_weight(i, 0);
                             }
                         }
                     } else if (keyEvent.key_value == KEY_HOLD) {
@@ -302,23 +302,25 @@ void app_main()
             int32_t adcValue[2];
             adcValue[0] = spi_adc_get_value();
             adcValue[1] = gpio_adc_get_value();
+            int32_t weight[2];
             for (int i = 0; i < 2; ++i)
             {
-                int8_t precision = 0;
-                int32_t weight = convert_weight(adcValue[i], i, &precision);
+                weight[i] = convert_weight(i, adcValue[i]);
 
                 // auto track zero
-                bool tracked = zero_track(i, adcValue[i], weight, 100);
+                bool tracked = zero_track(i, adcValue[i], weight[i], 100);
+                if (tracked) weight[i] = 0;
 
+                if (i == 1) weight[i]+=weight[0];
                 // change more than 1.5g, unlock display
-                if (display_lock[i] && (abs(last_weight[i]-weight) > DISPLAY_LOCK_THRESHOLD)) {
+                if (display_lock[i] && (abs(last_weight[i]-weight[i]) > DISPLAY_LOCK_THRESHOLD)) {
                     lock_display(i, false);
-                    last_weight[i] = weight;
+                    last_weight[i] = weight[i];
                 }else if (!display_lock[i]) {
                     // change more than 0.5g, clear count
-                    if (abs(last_weight[i]-weight) > 5){
+                    if (abs(last_weight[i]-weight[i]) > 5){
                         display_lock_count[i] = 0;
-                        last_weight[i] = weight;
+                        last_weight[i] = weight[i];
                     }else{
                         display_lock_count[i]++;
                         //3s not change, lock display
@@ -327,15 +329,9 @@ void app_main()
                         }
                     }
                 }
-                if (display_lock[i]) {
-                    if (tracked) {
-                        setDisplayNumber(i, 0, 0);
-                        ble_send_notification(i, 0, 0);
-                    }
-                } else {
-                    if (weight >10000 || weight<-1000) weight/=10;
-                    setDisplayNumber(i==0?1:0 , weight, precision);
-                    ble_send_notification(i==0?1:0 , weight, precision);
+                if (!display_lock[i] || tracked) {
+                    setDisplayNumber(i, weight[i]);
+                    bt_set_weight(i, weight[i]);
                 }
             }
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {

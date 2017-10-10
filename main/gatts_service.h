@@ -51,6 +51,6 @@ enum
 
 void bt_init();
 void bt_stop();
-void ble_send_notification(int32_t bottom, int32_t total);
+void bt_set_weight(int channel, int32_t value);
 
 #endif  /*_GATTS_SERVICE_H*/

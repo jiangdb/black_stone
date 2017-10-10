@@ -41,16 +41,6 @@
 #define CHAR_UUID_WEIGHT_MEAS            0x2A9D
 #define CHAR_UUID_WEIGHT_SCALE_FEATURE   0x2A9E
 
-uint8_t char1_str[] ={0x11,0x22,0x33};
-
-uint16_t weight_scale_handle_table[WSS_IDX_NB];
-
-esp_attr_value_t gatts_demo_char1_val = 
-{
-    .attr_max_len = GATTS_CHAR_VAL_LEN_MAX,
-    .attr_len       = sizeof(char1_str),
-    .attr_value     = char1_str,
-};
 
 static uint8_t weight_scale_service_uuid[16] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -91,25 +81,21 @@ struct gatts_profile_inst {
     uint16_t app_id;
     uint16_t conn_id;
     bool     connected;
-    uint16_t service_handle;
-    esp_gatt_srvc_id_t service_id;
-    uint16_t char_handle;
-    esp_bt_uuid_t char_uuid;
-    esp_gatt_perm_t perm;
-    esp_gatt_char_prop_t property;
-    uint16_t descr_handle;
-    esp_bt_uuid_t descr_uuid;
+    uint16_t *handle_table;
 };
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, 
                     esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
+uint16_t weight_scale_handle_table[WSS_IDX_NB];
 /* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
 static struct gatts_profile_inst weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_NUM] = {
     [WEIGHT_SCALE_PROFILE_APP_IDX] = {
         .gatts_cb = gatts_profile_event_handler,
         .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
+        .app_id = WEIGHT_SCALE_APP_ID,
         .connected = false,
+        .handle_table = weight_scale_handle_table,
     },
 };
 
@@ -119,10 +105,14 @@ typedef union {
         uint8_t userid_present:         1;                /* User ID present: 0 false 1 true */
         uint8_t timestamp_present:      1;                /* Time stamp present: 0 false 1 true */
         uint8_t measurement_units:      1;                /* Measurement Units: 0 SI 1 Imperial*/
-        uint8_t reserved:               4;                /* Reserved */
+        uint8_t total_present:          1;                /* Custom: 0 false, 1 true*/
+        uint8_t reserved:               3;                /* Reserved */
     };
     uint8_t val;
 } weight_measurement_flags_t;
+
+static int32_t weight_value[2] = {0,0};
+static TaskHandle_t xHandle = NULL;
 
 /*
  *  Weight Scale PROFILE ATTRIBUTES
@@ -169,7 +159,7 @@ static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
-                CHAR_DECLARATION_SIZE,CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_notify
+                CHAR_DECLARATION_SIZE,CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_indicate
             }
         },
       
@@ -178,7 +168,7 @@ static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
         {
             {ESP_GATT_AUTO_RSP},
             {
-                ESP_UUID_LEN_16, (uint8_t *)&weight_measurement_uuid, ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
+                ESP_UUID_LEN_16, (uint8_t *)&weight_measurement_uuid, ESP_GATT_PERM_READ,
                 WSPS_WEIGHT_MEAS_MAX_LEN,0, NULL
             }
         },
@@ -318,7 +308,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
         case ESP_GATTS_CONGEST_EVT:
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:
-            ESP_LOGI(GATTS_WEIGHT_TAG, "The number handle =%x\n",param->add_attr_tab.num_handle);
+            ESP_LOGI(GATTS_WEIGHT_TAG, "[%x]: The number handle =%x\n",param->add_attr_tab.svc_uuid.uuid.uuid16, param->add_attr_tab.num_handle);
             if (param->add_attr_tab.status != ESP_GATT_OK){
                 ESP_LOGE(GATTS_WEIGHT_TAG, "Create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
@@ -367,10 +357,10 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
-void ble_send_notification(int32_t bottom, int32_t total)
+//void ble_send_notification(int32_t bottom, int32_t total)
+void ble_send_notification()
 {
     //ESP_LOGI(GATTS_WEIGHT_TAG, "%s(%d, %d, %d)", __func__, displayNum, value, precision);
-
     if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
 
     uint8_t buffer[9];
@@ -379,11 +369,12 @@ void ble_send_notification(int32_t bottom, int32_t total)
         .userid_present = 0,
         .timestamp_present = 0,
         .measurement_units = 0,
+        .total_present = 1,
         .reserved = 0,
     };
     buffer[0] = flag.val;
-    memcpy(&buffer[1], &bottom, sizeof(int32_t));
-    memcpy(&buffer[5], &total, sizeof(int32_t));
+    memcpy(&buffer[1], &weight_value[0], sizeof(int32_t));
+    memcpy(&buffer[5], &weight_value[1], sizeof(int32_t));
 
     /*
     ESP_LOGI(GATTS_WEIGHT_TAG, "send notification: ");
@@ -399,8 +390,26 @@ void ble_send_notification(int32_t bottom, int32_t total)
             sizeof(buffer), buffer, false);
 }
 
+void weight_measurement_indicate_loop()
+{
+    while(1) {
+        ble_send_notification();
+        vTaskDelay(100/portTICK_RATE_MS);
+    }
+}
+
+void bt_set_weight(int channel, int32_t value)
+{
+    if (channel<0||channel>1) return;
+    weight_value[channel] = value;
+}
+
 void bt_stop()
 {
+    if( xHandle != NULL )
+    {
+        vTaskDelete( xHandle );
+    }
     esp_bluedroid_disable();
     esp_bluedroid_deinit();
     esp_bt_controller_disable(ESP_BT_MODE_BTDM);
@@ -439,5 +448,8 @@ void bt_init()
     esp_ble_gatts_register_callback(gatts_event_handler);
     esp_ble_gap_register_callback(gap_event_handler);
     esp_ble_gatts_app_register(WEIGHT_SCALE_APP_ID);
+
+    //Create task
+    xTaskCreate(&weight_measurement_indicate_loop, "weight_mesa_indicate_task", 2048, NULL, 5, &xHandle);
     return;
 }

@@ -110,13 +110,29 @@ static spi_device_handle_t spi;
 static TaskHandle_t xHandle = NULL;
 static int iChargingCount = 0;
 
-void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
+/*******************************************************************************
+**
+** Function         setDisplayNumber
+**
+** Description      display value.
+**
+** Parameter        displayNum: display number.
+**                  value: value should be displayed, in 100mg.
+**
+** Returns          weight in 0.1g.
+**
+*******************************************************************************/
+void setDisplayNumber(uint8_t displayNum, int32_t value)
 {
     int8_t data[DIGITAL_NUMBER];
+    int8_t precision;
 
     // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
-    if (value > 9999) { value = 9999; precision=0;}
-    if (value < -999) { value = -999; precision=0;}
+    if (value >= 99990) { value = 9999; precision=0;}
+    else if (value > 9999) { value /= 10; precision=0;}
+    else if (value > -1000) { precision=1;}
+    else if (value > -9990) { value /= 10; precision=0;}
+    else { value = -999; precision=0;}
 
     if (value == 0) {
         //show 0.0
@@ -129,7 +145,7 @@ void setDisplayNumber(uint8_t displayNum, int32_t value, int8_t precision)
         return;
     }
 
-    if (value < 10 && value > -10 && precision > 0) {
+    if (value < 10 && value > -10) {
         //show 0.*
         int start = 1+DIGITAL_NUMBER*displayNum;
         display_data[start] = NUMBER_OFF;

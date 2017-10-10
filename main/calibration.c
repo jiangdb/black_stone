@@ -52,7 +52,19 @@ int get_zero_offset(int channel, int32_t adcValue)
     return ((adcValue - zero[channel]) * precision[channel]);
 }
 
-int32_t convert_weight(int32_t adcValue, int8_t channel, int8_t *precision)
+/*******************************************************************************
+**
+** Function         convert_weight
+**
+** Description      convert adcvalue to weight, unit is 100mg.
+**
+** Parameter        channel: adc channel.
+**                  adcValue: adc value .
+**
+** Returns          weight in 0.1g.
+**
+*******************************************************************************/
+int32_t convert_weight(int8_t channel, int32_t adcValue)
 {
 
     if (channel<0||channel>CALIBRATION_NUMS) return 0;
@@ -60,10 +72,8 @@ int32_t convert_weight(int32_t adcValue, int8_t channel, int8_t *precision)
 
     int32_t weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     if (weight >= 100000 || weight <= -10000) {
-        *precision = 0;
         return (weight+50)/10;
     } else{
-        *precision = 1;
         return (weight+5)/10;
     }
 }
