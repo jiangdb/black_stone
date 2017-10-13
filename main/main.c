@@ -37,7 +37,7 @@ enum {
 extern void bs_wifi_init();
 extern void bs_wifi_stop();
 
-static const char *TAG = "BS";
+static const char *TAG = "MAIN";
 static int calibrate_tick = -1;
 static int calibrate_index = 0;
 static bool display_lock[2] = {false, false};

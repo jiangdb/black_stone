@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 
+#define MANUFACTURER            "Timemore" 
+#define FW_VERSION              "0.90.01"
+
 typedef enum{
     WEIGHT_UNIT_G,
     WEIGHT_UNIT_KG,
@@ -13,6 +16,9 @@ void config_close();
 
 int32_t config_read(char* name, int32_t default_value);
 bool config_write(char* name, int32_t value);
+
+// num must at least 13 bytes: mac 12 + 1 \0
+void config_get_serial_num(char* serial_num, int len);
 
 uint8_t config_get_zero_track();
 bool config_set_zero_track(uint8_t enable);

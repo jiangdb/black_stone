@@ -171,16 +171,14 @@ static const uint8_t weight_scale_ctrl_point_uuid[16] = {0x00,0x00,0x00,0x00,0x0
 static const uint8_t weight_scale_ctrl_point_ccc[2] = {0x00, 0x00};
 
 static const uint16_t manufacturer_name_uuid = ESP_GATT_UUID_MANU_NAME;
-static const uint8_t manufacturer_name_val[4] = {'t','e','s','t'};
 
 static const uint16_t model_number_uuid = ESP_GATT_UUID_MODEL_NUMBER_STR;
 static const uint8_t model_number_val[4] = {'0','1','0','1'};
 
 static const uint16_t serial_number_uuid = ESP_GATT_UUID_SERIAL_NUMBER_STR;
-static const uint8_t serial_number_val[4] = {'0','2','0','2'};
+static uint8_t serial_number_val[13] = {0};
 
 static const uint16_t firmware_revision_uuid = ESP_GATT_UUID_FW_VERSION_STR;
-static const uint8_t firmware_revision_val[5] = {'0','.','0','.','1'};
 
 /// Full WSS Database Description - Used to add attributes into the database
 static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
@@ -303,7 +301,7 @@ static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&manufacturer_name_uuid, ESP_GATT_PERM_READ,
-                10, sizeof(manufacturer_name_val), (uint8_t *)manufacturer_name_val 
+                50, strlen(MANUFACTURER), (uint8_t *)MANUFACTURER
             }
         },
 
@@ -343,7 +341,7 @@ static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&serial_number_uuid, ESP_GATT_PERM_READ,
-                10, sizeof(serial_number_val), (uint8_t *)serial_number_val
+                20, sizeof(serial_number_val)-1, (uint8_t *)serial_number_val
             }
         },
 
@@ -363,7 +361,7 @@ static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&firmware_revision_uuid, ESP_GATT_PERM_READ,
-                10, sizeof(firmware_revision_val), (uint8_t *)firmware_revision_val
+                10, strlen(FW_VERSION), (uint8_t *)FW_VERSION
             }
         },
 };
@@ -684,6 +682,9 @@ void bt_init()
         ESP_LOGE(GATTS_SERVICE_TAG, "%s enable bluetooth failed\n", __func__);
         return;
     }
+
+    //init device info
+    config_get_serial_num((char*)serial_number_val,sizeof(serial_number_val));
 
     esp_ble_gatts_register_callback(gatts_event_handler);
     esp_ble_gap_register_callback(gap_event_handler);

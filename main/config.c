@@ -72,6 +72,17 @@ uint8_t config_get_zero_track()
     return system_settings.zero_track;
 }
 
+// num must be 7 bytes
+void config_get_serial_num(char* serial_num, int len)
+{
+    //Use mac as serial number
+    uint8_t mac[6];
+    memset(mac, 0, sizeof(mac));
+    esp_efuse_mac_get_default(mac);
+    memset(serial_num, 0, len);
+    sprintf(serial_num, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 bool config_set_zero_track(uint8_t enable)
 {
     ESP_LOGD(TAG, "%s: %d\n", __func__, enable);
@@ -209,6 +220,12 @@ void config_init()
         ESP_LOGE(TAG, "(%d) opening NVS handle!\n", err);
     }
 
+    //Device Info
+    char serial_num[20];
+    config_get_serial_num(serial_num, 20);
+    ESP_LOGI(TAG, "%s: serial_num: %s", __func__, serial_num);
+
+    //System Setting
     memset(&system_settings,0,sizeof(system_settings));
 
     //zero track enable
