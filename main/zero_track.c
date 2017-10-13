@@ -42,7 +42,7 @@ bool zero_track(int ch, int32_t adcValue, int32_t weight, int interval)
     } else {
         total_time[ch] += interval;
         if (total_time[ch] >= TRACKER_TIME_THRESHOLD) {
-            set_zero(ch, adcValue);
+            cal_set_zero(ch, adcValue);
             return true;
         }
     }

@@ -117,7 +117,7 @@ static int32_t parse_adc(uint8_t data[4])
 
     /*
     if (abs(spi_adc_value - (value >> PRECISION)) >=2 ){
-        printf("spi adc value: (int)%d  ", value >> PRECISION );
+        ESP_LOGD(TAG,"spi adc value: (int)%d  ", value >> PRECISION );
         print_bin(value, 3);
     }
     */
@@ -173,13 +173,12 @@ static void push_to_buffer(int32_t value)
 #endif
     if (abs(spi_adc_value - value) >=3 ) {
         spi_adc_value = value;
-        //printf("spi_adc_value: %d\n", spi_adc_value);
+        //ESP_LOGD(TAG,"spi_adc_value: %d\n", spi_adc_value);
     }
 }
 
 static void spi_init()
 {
-    printf("%s: spi_init !!!\n", TAG);
     esp_err_t ret;
     spi_bus_config_t buscfg={
         .miso_io_num=-1,
@@ -206,7 +205,6 @@ static void spi_init()
 
 static void adc_gpio_init()
 {
-    printf("%s: gpio_init !!!\n", TAG);
     //GPIO config for the data line.
     gpio_config_t io_conf={
         .intr_type=GPIO_INTR_NEGEDGE,
@@ -232,7 +230,7 @@ static void spi_adc_loop()
 
         /*
         int data_level = gpio_get_level(PIN_NUM_DATA);
-        printf("spi isr interval: %d data level: %d\n",isrInterval, data_level);
+        ESP_LOGD(TAG,"spi isr interval: %d data level: %d\n",isrInterval, data_level);
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }
@@ -284,7 +282,7 @@ void spi_adc_shutdown()
 
 void spi_adc_init()
 {
-    printf("%s: CS1238 start!!!\n", TAG);
+    ESP_LOGD(TAG, "%s: CS1237 start!!!\n", __func__);
 
     //Create the semaphore.
     rdySem=xSemaphoreCreateBinary();

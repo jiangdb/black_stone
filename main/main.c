@@ -37,7 +37,7 @@ enum {
 extern void bs_wifi_init();
 extern void bs_wifi_stop();
 
-static const char *TAG = "black_stone";
+static const char *TAG = "BS";
 static int calibrate_tick = -1;
 static int calibrate_index = 0;
 static bool display_lock[2] = {false, false};
@@ -56,12 +56,11 @@ static void lock_display(int channel, bool lock)
     if (!lock) {
         display_lock_count[channel] = 0;
     }
-    printf("lock_display[%d]: %d!!!\n", channel, lock);
+    ESP_LOGD(TAG,"lock_display[%d]: %d!!!\n", channel, lock);
 }
 
 static void led_on()
 {
-    printf("%s: led gpio_init !!!\n", TAG);
     //GPIO config for the data line.
     gpio_config_t io_conf={
         .intr_type=GPIO_PIN_INTR_DISABLE,
@@ -86,7 +85,7 @@ static void enter_sleep()
     //enable gpio wakeup
     esp_deep_sleep_enable_ext1_wakeup(ext_wakeup_pin_1_mask | ext_wakeup_pin_2_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    printf("enter sleep now\n");
+    ESP_LOGD(TAG,"enter sleep now\n");
     esp_deep_sleep_start();
 }
 
@@ -94,10 +93,9 @@ static bool is_wakeup_by_key()
 {
     if (esp_deep_sleep_get_wakeup_cause() == ESP_DEEP_SLEEP_WAKEUP_EXT1) {
         uint64_t wakeup_pin_mask = esp_deep_sleep_get_ext1_wakeup_status();
-        // printf("wakeup_pin_mask: %llx\n", wakeup_pin_mask);
         if (wakeup_pin_mask != 0) {
             int pin = __builtin_ffsll(wakeup_pin_mask) - 1;
-            printf("Wake up from GPIO %d\n", pin);
+            ESP_LOGD(TAG,"Wake up from GPIO %d\n", pin);
             if (pin == 1) {
                 return true;
             }
@@ -124,9 +122,24 @@ static int count_key_repeat ()
     return key_repeat_count;
 }
 
+void set_zero()
+{
+    //set zero
+    int32_t adcValue[2];
+    adcValue[0] = spi_adc_get_value();
+    adcValue[1] = gpio_adc_get_value();
+    for (int i = 0; i < 2; ++i)
+    {
+        cal_set_zero(i,adcValue[i]);
+        setDisplayNumber(i, 0);
+        bt_set_weight(i, 0);
+    }
+}
+
+
 void handle_key_event(key_event_t keyEvent)
 {
-    printf("%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
+    ESP_LOGD(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
     switch(work_status) {
         case WORK_STATUS_CHARGING_SLEEP:
             if (keyEvent.key_type == NOT_CHARGE_KEY) {
@@ -156,20 +169,12 @@ void handle_key_event(key_event_t keyEvent)
                             done = true;
                         }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
                             //do calibration
-                            printf("enter calibration mode\n");
+                            ESP_LOGD(TAG,"enter calibration mode\n");
                             beap(0, 400);
                             work_status = WORK_STATUS_CALIBRATION;
                         }else if (key_repeat_count == 0){
                             //set zero
-                            int32_t adcValue[2];
-                            adcValue[0] = spi_adc_get_value();
-                            adcValue[1] = gpio_adc_get_value();
-                            for (int i = 0; i < 2; ++i)
-                            {
-                                set_zero(i,adcValue[i]);
-                                setDisplayNumber(i, 0);
-                                bt_set_weight(i, 0);
-                            }
+                            set_zero();
                         }
                     } else if (keyEvent.key_value == KEY_HOLD) {
                         trigger_sleep_count++;
@@ -205,8 +210,7 @@ int get_work_status()
 
 void app_main()
 {
-    printf("BLACK STONE!!!\n");
-	ESP_LOGI(TAG, "Start!!!");
+	ESP_LOGI(TAG, "BLACK STONE!!!");
 
     //init battery first
     battery_init();
@@ -216,7 +220,7 @@ void app_main()
 
     /* No Power */
     if (!is_charging() && is_battery_extremely_low()) {
-        printf("not charging and battery extremely low\n");
+	    ESP_LOGD(TAG, "not charging and battery extremely low\n");
         //enter sleep
         enter_sleep();
     }
@@ -226,7 +230,7 @@ void app_main()
 
     /* indicate user to charge*/
     if (!is_charging() && is_battery_level_low()) {
-        printf("not charging and battery low\n");
+        ESP_LOGD(TAG, "not charging and battery low\n");
         //indicate charge
         display_indicate_charge_only();
         //enter sleep
@@ -236,13 +240,13 @@ void app_main()
 
     // wake up by use means not by key
     if (!is_wakeup_by_key()) {
-        printf("not wake up by power key\n");
+        ESP_LOGD(TAG,"not wake up by power key\n");
 
         //enter charging sleep loop
         work_status = WORK_STATUS_CHARGING_SLEEP;
 
         charging = is_charging();
-        printf("charging: %d\n", charging);
+        ESP_LOGD(TAG,"charging: %d\n", charging);
 
         //loop to get power key and charge event
         while(charging && no_key_start) {
@@ -293,7 +297,7 @@ void app_main()
         display_indicate_charging();    
     }
 
-    printf("enter main loop!!!\n");
+    ESP_LOGD(TAG,"enter main loop!!!\n");
     work_status = WORK_STATUS_NORMAL;
 
     while(!done) {
@@ -336,17 +340,16 @@ void app_main()
             }
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
-            // printf("tick: %d\n", calibrate_tick);
             if (calibrate_tick >= 30) {
                 int32_t cal1 = spi_adc_get_value();
                 int32_t cal2 = gpio_adc_get_value();
-                printf("%d: %d\n", cal1, cal2);
+                ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
                 set_calibration(calibrate_index++, cal1, cal2);
                 beap(0, 200);
                 calibrate_tick = -1;
                 //exit calibration mode
                 if (calibrate_index >= CALIBRATION_NUMS) {
-                    printf("exist calibration mode\n");
+                    ESP_LOGD(TAG,"exist calibration mode\n");
                     work_status = WORK_STATUS_NORMAL;
                     calibrate_index = 0;
                     beap(100,400);
@@ -355,7 +358,7 @@ void app_main()
         }
     }
 
-    printf("quit main loop\n");
+    ESP_LOGD(TAG,"quit main loop\n");
 
     display_stop();
     spi_adc_shutdown();

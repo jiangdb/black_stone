@@ -2,9 +2,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
+#include "esp_log.h"
 #include "calibration.h"
 #include "config.h"
 
+
+#define TAG "CAL"
 
 #define CALIBRATION_WEIGHT             100        //100g
 #define CONFIG_CHANNEL_0_ZERO          "channel_0_zero"
@@ -32,14 +35,14 @@ static int32_t zero[2] = {0,0};
 static int32_t cal[2] = {1,1};
 static int32_t precision[2] = {0,0};
 
-void set_zero(int channel, int32_t adcValue)
+void cal_set_zero(int channel, int32_t adcValue)
 {
     if(channel<0||channel>1) return;
 
     zero[channel] = adcValue;
 
     config_write(config_zero_name[channel], zero[channel]);
-    printf("set zero[%d]: %d\n", channel, zero[channel]);
+    ESP_LOGD(TAG,"set zero[%d]: %d\n", channel, zero[channel]);
 }
 
 int32_t get_zero(int channel)
@@ -85,14 +88,14 @@ void set_calibration(int index, int32_t channel0, int32_t channel1)
     calibrations[0][index] = channel0;
     calibrations[1][index] = channel1;
 
-    printf("set cal[%d]: %d, %d\n", index, channel0, channel1);
+    ESP_LOGD(TAG,"set cal[%d]: %d, %d\n", index, channel0, channel1);
     if (index == 1) {
         cal[0] = calibrations[0][1]-calibrations[0][0];
         cal[1] = calibrations[1][1]-calibrations[1][0];
         config_write(CONFIG_CHANNEL_0_CALIBRATION, cal[0]);
         config_write(CONFIG_CHANNEL_1_CALIBRATION, cal[1]);
-        printf("calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][1]);
-        printf("write cal config: %d, %d\n", cal[0], cal[1]);
+        ESP_LOGD(TAG,"calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][1]);
+        ESP_LOGD(TAG,"write cal config: %d, %d\n", cal[0], cal[1]);
 
         if (cal[0] != 0 ) {
             precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];
@@ -107,11 +110,11 @@ void calibration_init()
 {
     zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 0);
     zero[1] = config_read(CONFIG_CHANNEL_1_ZERO, 0);
-    printf("get zero: %d, %d\n", zero[0], zero[1]);
+    ESP_LOGD(TAG,"get zero: %d, %d\n", zero[0], zero[1]);
 
     cal[0] = config_read(CONFIG_CHANNEL_0_CALIBRATION, 10000);
     cal[1] = config_read(CONFIG_CHANNEL_1_CALIBRATION, 10000);
-    printf("get cal: %d, %d\n", cal[0], cal[1]);
+    ESP_LOGD(TAG,"get cal: %d, %d\n", cal[0], cal[1]);
 
     if (cal[0] != 0 ) {
         precision[0] = (CALIBRATION_WEIGHT * 1000) / cal[0];

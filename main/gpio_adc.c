@@ -261,7 +261,7 @@ void gpio_adc_shutdown()
 
 void gpio_adc_init()
 {
-    printf("%s: CS1237 start!!!\n", TAG);
+    ESP_LOGD(TAG, "%s: CS1237 start!!!\n", __func__);
 
     //Create the semaphore.
     dataReadySem=xSemaphoreCreateBinary();
@@ -273,8 +273,6 @@ void gpio_adc_init()
 #endif
 
     //GPIO config
-    printf("%s: gpio_init !!!\n", TAG);
-
     gpio_config_t clk_conf={
         .intr_type=GPIO_PIN_INTR_DISABLE,
         .mode=GPIO_MODE_OUTPUT,

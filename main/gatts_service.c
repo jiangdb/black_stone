@@ -27,20 +27,41 @@
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 #include "gatts_service.h"
+#include "config.h"
 
-#define GATTS_WEIGHT_TAG "GATTS_WEIGHT"
+#define GATTS_SERVICE_TAG "GATTS_SERVICE"
 
 #define WEIGHT_SCALE_PROFILE_NUM       1
 #define WEIGHT_SCALE_PROFILE_APP_IDX   0
 #define WEIGHT_SCALE_APP_ID            0x55
 #define DEVICE_NAME                    "Timemore Scale"
 #define WEIGHT_SCALE_SVC_INST_ID       0
+#define DEVICE_INFORMATION_SVC_INST_ID 1
 #define GATTS_CHAR_VAL_LEN_MAX         0x40
 
  /// Weight Scale Measurement
-#define CHAR_UUID_WEIGHT_MEAS            0x2A9D
-#define CHAR_UUID_WEIGHT_SCALE_FEATURE   0x2A9E
+#define CHAR_UUID_WEIGHT_MEAS                   0x2A9D
+#define CHAR_UUID_WEIGHT_SCALE_FEATURE          0x2A9E
 
+#define WEIGHT_CONTROL_OPT_READ         0
+#define WEIGHT_CONTROL_OPT_WRITE        1
+#define WEIGHT_CONTROL_OPT_NOTIFY       2
+#define WEIGHT_CONTROL_STATUS_SUCCESS   0
+#define WEIGHT_CONTROL_STATUS_FAIL      1
+#define WEIGHT_CONTROL_MAX_LEN          128
+
+enum {
+    WEIGHT_CONTROL_SET_ZERO,
+    WEIGHT_CONTROL_ZERO_TRACK,
+    WEIGHT_CONTROL_ALARM,
+    WEIGHT_CONTROL_WEIGHT_UNIT,
+    WEIGHT_CONTROL_ALARM_TIME,
+    WEIGHT_CONTROL_ALARM_WEIGHT,
+    WEIGHT_CONTROL_WIFI,
+    WEIGHT_CONTROL_FW_UPGRADE,
+};
+
+extern void set_zero();
 
 static uint8_t weight_scale_service_uuid[16] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -88,6 +109,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
                     esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
 
 uint16_t weight_scale_handle_table[WSS_IDX_NB];
+uint16_t device_information_handle_table[DIS_IDX_NB];
 /* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
 static struct gatts_profile_inst weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_NUM] = {
     [WEIGHT_SCALE_PROFILE_APP_IDX] = {
@@ -121,6 +143,8 @@ static TaskHandle_t xHandle = NULL;
 
 /// Weight Scale Service
 static const uint16_t weight_scale_svc = ESP_GATT_UUID_WEIGHT_SCALE_SVC;
+/// Device Information Service
+static const uint16_t device_information_svc = ESP_GATT_UUID_DEVICE_INFO_SVC;
 
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
@@ -131,6 +155,7 @@ static const uint8_t char_prop_indicate = ESP_GATT_CHAR_PROP_BIT_INDICATE;
 static const uint8_t char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 static const uint8_t char_prop_read = ESP_GATT_CHAR_PROP_BIT_READ;
 static const uint8_t char_prop_read_write = ESP_GATT_CHAR_PROP_BIT_WRITE|ESP_GATT_CHAR_PROP_BIT_READ;
+static const uint8_t char_prop_read_write_notify = ESP_GATT_CHAR_PROP_BIT_WRITE|ESP_GATT_CHAR_PROP_BIT_READ|ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 
 /// Weight Scale Service - Weight Measurement Characteristic, indicate
 static const uint16_t weight_measurement_uuid = CHAR_UUID_WEIGHT_MEAS;
@@ -138,7 +163,24 @@ static const uint8_t weight_measurement_ccc[2] ={ 0x00, 0x00};
 
 /// Weight Scale Service - Weight Scale Feature characteristic, read
 static const uint16_t weight_scale_feature_uuid = CHAR_UUID_WEIGHT_SCALE_FEATURE;
-static const uint32_t weight_scale_feature_val[1] = {0x38};
+static const uint32_t weight_scale_feature_val = 0x38;
+
+/// Weight Scale Service - Custom: Weight Scale Control Point characteristic, write&read
+//custom 128bit UUID 0x00001234800000000000000000000000
+static const uint8_t weight_scale_ctrl_point_uuid[16] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x08,0x34,0x12,0x00,0x00};
+static const uint8_t weight_scale_ctrl_point_ccc[2] = {0x00, 0x00};
+
+static const uint16_t manufacturer_name_uuid = ESP_GATT_UUID_MANU_NAME;
+static const uint8_t manufacturer_name_val[4] = {'t','e','s','t'};
+
+static const uint16_t model_number_uuid = ESP_GATT_UUID_MODEL_NUMBER_STR;
+static const uint8_t model_number_val[4] = {'0','1','0','1'};
+
+static const uint16_t serial_number_uuid = ESP_GATT_UUID_SERIAL_NUMBER_STR;
+static const uint8_t serial_number_val[4] = {'0','2','0','2'};
+
+static const uint16_t firmware_revision_uuid = ESP_GATT_UUID_FW_VERSION_STR;
+static const uint8_t firmware_revision_val[5] = {'0','.','0','.','1'};
 
 /// Full WSS Database Description - Used to add attributes into the database
 static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
@@ -199,14 +241,136 @@ static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&weight_scale_feature_uuid , ESP_GATT_PERM_READ,
-                sizeof(uint32_t), sizeof(weight_scale_feature_val), (uint8_t *)weight_scale_feature_val
+                sizeof(uint32_t), sizeof(weight_scale_feature_val), (uint8_t *)&weight_scale_feature_val
+            }
+        },
+
+    // Custom: Weight Scale Control Point Characteristic Declaration
+    [WSS_IDX_WS_CTNL_PT_CHAR] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE,CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read_write_notify
+            }
+        },
+                                         			
+    // Custom: Weight Scale Control Point Characteristic Value
+    [WSS_IDX_WS_CTNL_PT_VAL] = 
+        {
+            {ESP_GATT_RSP_BY_APP},
+            {
+                ESP_UUID_LEN_128, (uint8_t *)&weight_scale_ctrl_point_uuid, ESP_GATT_PERM_WRITE|ESP_GATT_PERM_READ,
+                255, NULL, NULL
+            }
+        },
+
+    // Custom: Weight Scale Control Point Characteristic - Client Characteristic Configuration Descriptor
+    [WSS_IDX_WS_CTNL_NTF_CFG] = 
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
+                sizeof(uint16_t),sizeof(weight_scale_ctrl_point_ccc), (uint8_t *)weight_scale_ctrl_point_ccc
+            }
+        },
+};
+
+static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
+    // Device Information Service Declaration
+    [DIS_IDX_SVC] = 
+        {
+            { ESP_GATT_AUTO_RSP },
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid, ESP_GATT_PERM_READ,
+                sizeof(uint16_t), sizeof(device_information_svc), (uint8_t *)&device_information_svc
+            }
+        },
+
+    // Manufacturer Name String Characteristic Declaration
+    [DIS_IDX_MANU_NAME_CHAR] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read
+            }
+        },
+
+    // Manufacturer Name String Characteristic Value
+    [DIS_IDX_MANU_NAME_VAL] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&manufacturer_name_uuid, ESP_GATT_PERM_READ,
+                10, sizeof(manufacturer_name_val), (uint8_t *)manufacturer_name_val 
+            }
+        },
+
+    // Model Number String Characteristic Declaration
+    [DIS_IDX_MODEL_NUMBER_CHAR] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read
+            }
+        },
+
+    // Model Number String Characteristic Value
+    [DIS_IDX_MODEL_NUMBER_VAL] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&model_number_uuid, ESP_GATT_PERM_READ,
+                10, sizeof(model_number_val), (uint8_t *)model_number_val
+            }
+        },
+
+    // Serial Number String Characteristic Declaration
+    [DIS_IDX_SERIAL_NUMBER_CHAR] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read
+            }
+        },
+
+    // Serial Number String Characteristic Value
+    [DIS_IDX_SERIAL_NUMBER_VAL] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&serial_number_uuid, ESP_GATT_PERM_READ,
+                10, sizeof(serial_number_val), (uint8_t *)serial_number_val
+            }
+        },
+
+    // Firmware Revision String Characteristic Declaration
+    [DIS_IDX_FW_REVISION_CHAR] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid, ESP_GATT_PERM_READ,
+                CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t *)&char_prop_read
+            }
+        },
+
+    // Firmware Revision String Characteristic Value
+    [DIS_IDX_FW_REVISION_VAL] =
+        {
+            {ESP_GATT_AUTO_RSP},
+            {
+                ESP_UUID_LEN_16, (uint8_t *)&firmware_revision_uuid, ESP_GATT_PERM_READ,
+                10, sizeof(firmware_revision_val), (uint8_t *)firmware_revision_val
             }
         },
 };
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
-    ESP_LOGE(GATTS_WEIGHT_TAG, "GAP_EVT, event %d\n", event);
+    ESP_LOGD(GATTS_SERVICE_TAG, "GAP_EVT, event %d\n", event);
 
     switch (event) {
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
@@ -215,7 +379,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
         //advertising start complete event to indicate advertising start successfully or failed
         if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-            ESP_LOGE(GATTS_WEIGHT_TAG, "Advertising start failed\n");
+            ESP_LOGE(GATTS_SERVICE_TAG, "Advertising start failed\n");
         }
         break;
     default:
@@ -223,42 +387,124 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     }
 }
 
+static void init_weight_control_value(uint8_t* value, uint16_t* len)
+{
+    value[0] = WEIGHT_CONTROL_OPT_READ;           //operation type
+    value[1] = WEIGHT_CONTROL_STATUS_SUCCESS;     //operation status
+    value[2] = config_get_zero_track();
+    value[3] = config_get_alarm_enable();
+    value[4] = config_get_weight_unit();
+    uint16_t alarm_time = config_get_alarm_time();
+    value[5] = (uint8_t)(alarm_time>>8);
+    value[6] = (uint8_t)alarm_time;
+    uint16_t alarm_weight = config_get_alarm_weight();
+    value[7] = (uint8_t)(alarm_weight>>8);
+    value[8] = (uint8_t)alarm_weight;
+    char* wifi_name = config_get_wifi_name();
+    if (wifi_name == NULL) {
+        value[9] = 0;
+        *len = 10;
+    }else{
+        value[9] = strlen(wifi_name);
+        memcpy(&value[10], wifi_name, value[9]);
+        *len = 10 + value[9];
+    }
+}
+
+static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+{
+    //prepare response
+    uint8_t reply[2];
+    memset(reply, 0, sizeof(reply));
+    reply[0] = WEIGHT_CONTROL_OPT_WRITE;
+    reply[1] = WEIGHT_CONTROL_STATUS_SUCCESS;
+
+    uint8_t *pData = (uint8_t *)param->write.value;
+    ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control %d", pData[0]);
+    switch(pData[0]) {
+        case WEIGHT_CONTROL_SET_ZERO:
+            set_zero();
+            break;
+        case WEIGHT_CONTROL_ZERO_TRACK:
+            config_set_zero_track(pData[1]);
+            break;
+        case WEIGHT_CONTROL_ALARM:
+            config_set_alarm_enable(pData[1]);
+            break;
+        case WEIGHT_CONTROL_WEIGHT_UNIT:
+            config_set_weight_unit(pData[1]);
+            break;
+        case WEIGHT_CONTROL_ALARM_TIME:
+            {
+                uint16_t time = pData[1]<<8|pData[2];
+                config_set_alarm_time(time);
+            }
+            break;
+        case WEIGHT_CONTROL_ALARM_WEIGHT:
+            {
+                uint16_t weight = pData[1]<<8|pData[2];
+                config_set_alarm_weight(weight);
+            }
+            break;
+        case WEIGHT_CONTROL_WIFI:
+            {
+                uint8_t name_len = pData[1];
+                config_set_wifi_name((char*)&pData[2],name_len);
+                uint16_t pass_offset = 2+name_len;
+                uint8_t pass_len = pData[pass_offset];
+                config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
+            }
+            break;
+        case WEIGHT_CONTROL_FW_UPGRADE:
+            break;
+        default:
+            ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])
+            reply[1] = WEIGHT_CONTROL_STATUS_FAIL;
+            break;
+    }
+
+    esp_ble_gatts_send_indicate(gatts_if,param->write.conn_id,param->write.handle,
+            sizeof(reply), reply, false);
+}
+
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, 
                                            esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) 
 {
-    ESP_LOGE(GATTS_WEIGHT_TAG, "event = %x\n",event);
+    //ESP_LOGE(GATTS_SERVICE_TAG, "event = %x\n",event);
     switch (event) {
         case ESP_GATTS_REG_EVT:
-            ESP_LOGI(GATTS_WEIGHT_TAG, "REGISTER_APP_EVT, status %d, app_id %d\n", param->reg.status, param->reg.app_id);
             esp_ble_gap_set_device_name(DEVICE_NAME);
             esp_ble_gap_config_adv_data(&weight_scale_adv_config);
             esp_ble_gatts_create_attr_tab(weight_scale_gatt_db, gatts_if, 
                                     WSS_IDX_NB, WEIGHT_SCALE_SVC_INST_ID);
+            esp_ble_gatts_create_attr_tab(device_information_gatt_db, gatts_if, 
+                                    DIS_IDX_NB, DEVICE_INFORMATION_SVC_INST_ID);
             break;
         case ESP_GATTS_READ_EVT:
-            ESP_LOGI(GATTS_WEIGHT_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
-            /*
+            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
+            if (param->read.handle == weight_scale_handle_table[WSS_IDX_WS_CTNL_PT_VAL]) {
+                ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, read control\n");
                 esp_gatt_rsp_t rsp;
                 memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
                 rsp.attr_value.handle = param->read.handle;
-                rsp.attr_value.len = 4;
-                rsp.attr_value.value[0] = 0xde;
-                rsp.attr_value.value[1] = 0xed;
-                rsp.attr_value.value[2] = 0xbe;
-                rsp.attr_value.value[3] = 0xef;
+                init_weight_control_value(rsp.attr_value.value, &rsp.attr_value.len);
                 esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
                                             ESP_GATT_OK, &rsp);
-             */
+            }
             break;
         case ESP_GATTS_WRITE_EVT: 
-            ESP_LOGI(GATTS_WEIGHT_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %d, handle %d\n", param->write.conn_id, param->write.trans_id, param->write.handle);
-            ESP_LOGI(GATTS_WEIGHT_TAG, "GATT_WRITE_EVT, value len %d, value %08x\n", param->write.len, *(uint32_t *)param->write.value);
-            /*
-                example_write_event_env(gatts_if, &a_prepare_write_env, param);
-                if (param->write.value[0] == 0xaa && param->write.value[1] == 0x55) {
-                    example_send_notification(gatts_if, param->write.conn_id, param->write.handle);
+            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %d, handle %d", param->write.conn_id, param->write.trans_id, param->write.handle);
+            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, value len %d, value %08x", param->write.len, *(uint8_t *)param->write.value);
+            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, need_rsp %d, is_prep %d", param->write.need_rsp, param->write.is_prep);
+
+            if (param->write.handle == weight_scale_handle_table[WSS_IDX_WS_CTNL_PT_VAL]) {
+                ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control");
+                if (param->write.need_rsp && !param->write.is_prep){
+                    esp_gatt_status_t status = ESP_GATT_OK;
+                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, NULL);
+                    handle_weight_control_write(gatts_if, param);
                 }
-             */
+            }
             break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             break;
@@ -282,7 +528,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
             conn_params.max_int = 0x50;    // max_int = 0x50*1.25ms = 100ms
             conn_params.min_int = 0x30;    // min_int = 0x30*1.25ms = 60ms
             conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
-            ESP_LOGI(GATTS_WEIGHT_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d\n",
+            ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d\n",
                      param->connect.conn_id,
                      param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
                      param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5],
@@ -308,17 +554,19 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
         case ESP_GATTS_CONGEST_EVT:
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:
-            ESP_LOGI(GATTS_WEIGHT_TAG, "[%x]: The number handle =%x\n",param->add_attr_tab.svc_uuid.uuid.uuid16, param->add_attr_tab.num_handle);
+            ESP_LOGD(GATTS_SERVICE_TAG, "[%x]: The number handle =%x\n",param->add_attr_tab.svc_uuid.uuid.uuid16, param->add_attr_tab.num_handle);
             if (param->add_attr_tab.status != ESP_GATT_OK){
-                ESP_LOGE(GATTS_WEIGHT_TAG, "Create attribute table failed, error code=0x%x", param->add_attr_tab.status);
-            }
-            else if (param->add_attr_tab.num_handle != WSS_IDX_NB){
-                ESP_LOGE(GATTS_WEIGHT_TAG, "Create attribute table abnormally, num_handle (%d) \
-                        doesn't equal to WSS_IDX_NB(%d)", param->add_attr_tab.num_handle, WSS_IDX_NB);
+                ESP_LOGE(GATTS_SERVICE_TAG, "Create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
             else {
-                memcpy(weight_scale_handle_table, param->add_attr_tab.handles, sizeof(weight_scale_handle_table));
-                esp_ble_gatts_start_service(weight_scale_handle_table[WSS_IDX_SVC]);
+                if (param->add_attr_tab.svc_uuid.uuid.uuid16 == weight_scale_svc) {
+                    memcpy(weight_scale_handle_table, param->add_attr_tab.handles, sizeof(weight_scale_handle_table));
+                    esp_ble_gatts_start_service(weight_scale_handle_table[WSS_IDX_SVC]);
+                }
+                if (param->add_attr_tab.svc_uuid.uuid.uuid16 == device_information_svc) {
+                    memcpy(device_information_handle_table, param->add_attr_tab.handles, sizeof(device_information_handle_table));
+                    esp_ble_gatts_start_service(device_information_handle_table[DIS_IDX_SVC]);
+                }
             }
             break;
         default:
@@ -330,14 +578,14 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, 
                                     esp_ble_gatts_cb_param_t *param)
 {
-    ESP_LOGI(GATTS_WEIGHT_TAG, "EVT %d, gatts if %d\n", event, gatts_if);
+    ESP_LOGD(GATTS_SERVICE_TAG, "EVT %d, gatts if %d\n", event, gatts_if);
 
     /* If event is register event, store the gatts_if for each profile */
     if (event == ESP_GATTS_REG_EVT) {
         if (param->reg.status == ESP_GATT_OK) {
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].gatts_if = gatts_if;
         } else {
-            ESP_LOGI(GATTS_WEIGHT_TAG, "Reg app failed, app_id %04x, status %d\n",
+            ESP_LOGE(GATTS_SERVICE_TAG, "Reg app failed, app_id %04x, status %d\n",
                     param->reg.app_id, 
                     param->reg.status);
             return;
@@ -357,10 +605,9 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
-//void ble_send_notification(int32_t bottom, int32_t total)
 void ble_send_notification()
 {
-    //ESP_LOGI(GATTS_WEIGHT_TAG, "%s(%d, %d, %d)", __func__, displayNum, value, precision);
+    //ESP_LOGI(GATTS_SERVICE_TAG, "%s(%d, %d, %d)", __func__, displayNum, value, precision);
     if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
 
     uint8_t buffer[9];
@@ -376,13 +623,6 @@ void ble_send_notification()
     memcpy(&buffer[1], &weight_value[0], sizeof(int32_t));
     memcpy(&buffer[5], &weight_value[1], sizeof(int32_t));
 
-    /*
-    ESP_LOGI(GATTS_WEIGHT_TAG, "send notification: ");
-    for (int i=0;i<sizeof(buffer);i++) {
-        ESP_LOGI(GATTS_WEIGHT_TAG, "[%d]: %02x", i, buffer[i]);
-    }
-    */
-
     esp_ble_gatts_send_indicate(
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].gatts_if,
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].conn_id,
@@ -393,7 +633,7 @@ void ble_send_notification()
 void weight_measurement_indicate_loop()
 {
     while(1) {
-        ble_send_notification();
+        //ble_send_notification();
         vTaskDelay(100/portTICK_RATE_MS);
     }
 }
@@ -418,30 +658,30 @@ void bt_stop()
 
 void bt_init()
 {
-    esp_err_t ret;
+    ESP_LOGD(GATTS_SERVICE_TAG, "%s init bluetooth\n", __func__);
 
+    esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     ret = esp_bt_controller_init(&bt_cfg);
     if (ret) {
-        ESP_LOGE(GATTS_WEIGHT_TAG, "%s enable controller failed\n", __func__);
+        ESP_LOGE(GATTS_SERVICE_TAG, "%s enable controller failed\n", __func__);
         return;
     }
 
     ret = esp_bt_controller_enable(ESP_BT_MODE_BTDM);
     if (ret) {
-        ESP_LOGE(GATTS_WEIGHT_TAG, "%s enable controller failed\n", __func__);
+        ESP_LOGE(GATTS_SERVICE_TAG, "%s enable controller failed\n", __func__);
         return;
     }
 
-    ESP_LOGI(GATTS_WEIGHT_TAG, "%s init bluetooth\n", __func__);
     ret = esp_bluedroid_init();
     if (ret) {
-        ESP_LOGE(GATTS_WEIGHT_TAG, "%s init bluetooth failed\n", __func__);
+        ESP_LOGE(GATTS_SERVICE_TAG, "%s init bluetooth failed\n", __func__);
         return;
     }
     ret = esp_bluedroid_enable();
     if (ret) {
-        ESP_LOGE(GATTS_WEIGHT_TAG, "%s enable bluetooth failed\n", __func__);
+        ESP_LOGE(GATTS_SERVICE_TAG, "%s enable bluetooth failed\n", __func__);
         return;
     }
 

@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_log.h"
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
@@ -21,7 +22,11 @@
 #include "queue_buffer.h"
 
 /*
-*/
+ * defines
+ */
+
+#define TAG  "DISPLAY"
+
 #define PIN_NUM_MISO 13
 #define PIN_NUM_MOSI 12
 #define PIN_NUM_CLK  14
@@ -127,7 +132,7 @@ void setDisplayNumber(uint8_t displayNum, int32_t value)
     int8_t data[DIGITAL_NUMBER];
     int8_t precision;
 
-    // printf("setDisplayInteger(%d, %d)!!!\n", displayNum, value);
+    // ESP_LOGD(TAG,"setDisplayInteger(%d, %d)!!!\n", displayNum, value);
     if (value >= 99990) { value = 9999; precision=0;}
     else if (value > 9999) { value /= 10; precision=0;}
     else if (value > -1000) { precision=1;}
@@ -332,13 +337,13 @@ void display_indicate_charging_only()
 
 void display_indicate_charging()
 {
-    printf("indicate charging !!!\n");
+    ESP_LOGD(TAG,"indicate charging !!!\n");
     iChargingCount = 1;
 }
 
 void display_disable_charging()
 {
-    printf("disable indicate charging !!!\n");
+    ESP_LOGD(TAG,"disable indicate charging !!!\n");
     iChargingCount = 0;
     int level = get_battery_level();
     setBatteryLevel(level);
@@ -380,7 +385,7 @@ void display_stop()
 
 void display_init()
 {
-    printf("SPI Display!!!\n");
+    ESP_LOGD(TAG,"SPI Display!!!\n");
 
     esp_err_t ret;
     spi_bus_config_t buscfg={
