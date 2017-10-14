@@ -8,10 +8,12 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
-#define BATTERY_LEVEL_EMPTY			0
-#define BATTERY_LEVEL_1				1
-#define BATTERY_LEVEL_2				2
-#define BATTERY_LEVEL_3				3
+enum {
+    BATTERY_LEVEL_EMPTY,
+    BATTERY_LEVEL_1,
+    BATTERY_LEVEL_2,
+    BATTERY_LEVEL_3
+};
 
 void display_init();
 void display_start();

@@ -186,6 +186,7 @@ typedef union {
 
 static int32_t weight_value[2] = {0,0};
 static TaskHandle_t xHandle = NULL;
+static SemaphoreHandle_t connectedSem = NULL;
 
 /*
  *  Weight Scale PROFILE ATTRIBUTES
@@ -588,6 +589,8 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected = true;
             //start sent the update connection parameters to the peer device.
             esp_ble_gap_update_conn_params(&conn_params);
+
+            xSemaphoreGive(connectedSem);
             }
             break;
         case ESP_GATTS_DISCONNECT_EVT:
@@ -689,8 +692,7 @@ void bt_notify_battery_level(uint8_t level)
 static void ble_notify_measurement()
 {
     //ESP_LOGI(GATTS_SERVICE_TAG, "%s()", __func__);
-    if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
-
+    //if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
     uint8_t buffer[9];
     weight_measurement_flags_t flag = {
         .bmi_height_present = 0,
@@ -714,7 +716,11 @@ static void ble_notify_measurement()
 void weight_measurement_indicate_loop()
 {
     while(1) {
-        //ble_notify_measurement();
+        if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) {
+            xSemaphoreTake( connectedSem, portMAX_DELAY );
+        }
+
+        ble_notify_measurement();
         vTaskDelay(100/portTICK_RATE_MS);
     }
 }
@@ -773,6 +779,7 @@ void bt_init()
     esp_ble_gap_register_callback(gap_event_handler);
     esp_ble_gatts_app_register(WEIGHT_SCALE_APP_ID);
 
+    connectedSem=xSemaphoreCreateBinary();
     //Create task
     xTaskCreate(&weight_measurement_indicate_loop, "weight_mesa_indicate_task", 2048, NULL, 5, &xHandle);
     return;

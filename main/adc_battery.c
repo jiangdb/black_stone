@@ -25,6 +25,7 @@
 extern void handle_key_event(key_event_t keyEvent);
 
 static TaskHandle_t xHandle = NULL;
+static uint8_t batterLevel = 255;
 
 static int read_voltage()
 {
@@ -37,6 +38,15 @@ static int read_voltage()
     return (voltage+50)/100*100;
 }
 
+static void setDisplay(uint8_t level)
+{
+    if (batterLevel != level) {
+        setBatteryLevel(level);
+        bt_notify_battery_level(level);
+        batterLevel = level;
+    }
+}
+
 void battery_task(void* arg)
 {
     int voltage = 0;
@@ -45,17 +55,13 @@ void battery_task(void* arg)
         voltage = read_voltage();
 
         if (voltage >= BATTERY_PERCENTAGE_75) {
-            setBatteryLevel(BATTERY_LEVEL_3);
-            bt_notify_battery_level(BATTERY_LEVEL_3);
+            setDisplay(BATTERY_LEVEL_3);
         }else if (voltage >= BATTERY_PERCENTAGE_50) {
-            setBatteryLevel(BATTERY_LEVEL_2);
-            bt_notify_battery_level(BATTERY_LEVEL_2);
+            setDisplay(BATTERY_LEVEL_2);
         }else if (voltage >= BATTERY_PERCENTAGE_25) {
-            setBatteryLevel(BATTERY_LEVEL_1);
-            bt_notify_battery_level(BATTERY_LEVEL_1);
+            setDisplay(BATTERY_LEVEL_1);
         }else if (voltage >= BATTERY_PERCENTAGE_0) {
-            setBatteryLevel(BATTERY_LEVEL_EMPTY);
-            bt_notify_battery_level(BATTERY_LEVEL_EMPTY);
+            setDisplay(BATTERY_LEVEL_EMPTY);
         }else{
             key_event_t keyEvent;
             keyEvent.key_type = SLEEP_KEY;
