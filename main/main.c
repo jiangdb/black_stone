@@ -12,6 +12,7 @@
 #include "battery.h"
 #include "display.h"
 #include "gatts_service.h"
+#include "wifi_service.h"
 #include "bs_timer.h"
 #include "queue_buffer.h"
 #include "key.h"
@@ -21,6 +22,8 @@
 #include "gpio_adc.h"
 #include "config.h"
 #include "zero_track.h"
+
+#define TAG  "MAIN"
 
 #define GPIO_LED_IO                 19
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
@@ -34,10 +37,6 @@ enum {
     WORK_STATUS_CALIBRATION
 };
 
-extern void bs_wifi_init();
-extern void bs_wifi_stop();
-
-static const char *TAG = "MAIN";
 static int calibrate_tick = -1;
 static int calibrate_index = 0;
 static bool display_lock[2] = {false, false};
@@ -175,6 +174,7 @@ void handle_key_event(key_event_t keyEvent)
                         }else if (key_repeat_count == 0){
                             //set zero
                             set_zero();
+                            ws_connect("HOME","QWEiop987");
                         }
                     } else if (keyEvent.key_value == KEY_HOLD) {
                         trigger_sleep_count++;
@@ -281,12 +281,11 @@ void app_main()
     spi_adc_init();
     gpio_adc_init();
 
-    /* Initialise wifi */
-    // bs_wifi_init();
+    /* Initialise wifi service*/
+    ws_init();
 
-    /* Initialise bluetooth */
+    /* Initialise gatts service */
     bt_init();
-
 
     /* Initialise timer */
     bs_timer_init();
@@ -365,7 +364,7 @@ void app_main()
     gpio_adc_shutdown();
     bs_timer_stop();
     bt_stop();
-    // bs_wifi_stop();
+    ws_stop();
     battery_stop();
     if (is_charging()) {
         esp_restart();

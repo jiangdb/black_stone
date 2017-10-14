@@ -27,21 +27,26 @@
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 #include "gatts_service.h"
+#include "wifi_service.h"
 #include "config.h"
+#include "battery.h"
 
-#define GATTS_SERVICE_TAG "GATTS_SERVICE"
+/*
+ * DEFINES
+ */
 
-#define WEIGHT_SCALE_PROFILE_NUM       1
-#define WEIGHT_SCALE_PROFILE_APP_IDX   0
-#define WEIGHT_SCALE_APP_ID            0x55
-#define DEVICE_NAME                    "Timemore Scale"
-#define WEIGHT_SCALE_SVC_INST_ID       0
-#define DEVICE_INFORMATION_SVC_INST_ID 1
-#define GATTS_CHAR_VAL_LEN_MAX         0x40
+#define GATTS_SERVICE_TAG               "GATTS_SERVICE"
+
+#define WEIGHT_SCALE_PROFILE_NUM        1
+#define WEIGHT_SCALE_PROFILE_APP_IDX    0
+#define WEIGHT_SCALE_APP_ID             0x55
+#define DEVICE_NAME                     "Timemore Scale"
+#define WEIGHT_SCALE_SVC_INST_ID        0
+#define DEVICE_INFORMATION_SVC_INST_ID  1
 
  /// Weight Scale Measurement
-#define CHAR_UUID_WEIGHT_MEAS                   0x2A9D
-#define CHAR_UUID_WEIGHT_SCALE_FEATURE          0x2A9E
+#define CHAR_UUID_WEIGHT_MEAS           0x2A9D
+#define CHAR_UUID_WEIGHT_SCALE_FEATURE  0x2A9E
 
 #define WEIGHT_CONTROL_OPT_READ         0
 #define WEIGHT_CONTROL_OPT_WRITE        1
@@ -49,6 +54,16 @@
 #define WEIGHT_CONTROL_STATUS_SUCCESS   0
 #define WEIGHT_CONTROL_STATUS_FAIL      1
 #define WEIGHT_CONTROL_MAX_LEN          128
+
+#define CHAR_DECLARATION_SIZE           (sizeof(uint8_t))
+
+/*
+ * ENUMS
+ */
+enum {
+    WEIGHT_CONTROL_NOTIFY_WIFI,
+    WEIGHT_CONTROL_NOTIFY_BATTERY,
+};
 
 enum {
     WEIGHT_CONTROL_SET_ZERO,
@@ -59,6 +74,42 @@ enum {
     WEIGHT_CONTROL_ALARM_WEIGHT,
     WEIGHT_CONTROL_WIFI,
     WEIGHT_CONTROL_FW_UPGRADE,
+};
+
+enum
+{
+    WSS_IDX_SVC,
+
+    WSS_IDX_WS_MEAS_CHAR,
+    WSS_IDX_WS_MEAS_VAL,
+    WSS_IDX_WS_MEAS_NTF_CFG,
+
+    WSS_IDX_WS_FEATURE_CHAR,
+    WSS_IDX_WS_FEATURE_VAL,
+
+    WSS_IDX_WS_CTNL_PT_CHAR,
+    WSS_IDX_WS_CTNL_PT_VAL,
+    WSS_IDX_WS_CTNL_NTF_CFG,
+
+    WSS_IDX_NB,
+};
+
+enum
+{
+    DIS_IDX_SVC,
+    DIS_IDX_MANU_NAME_CHAR,
+    DIS_IDX_MANU_NAME_VAL,
+    
+    DIS_IDX_MODEL_NUMBER_CHAR,
+    DIS_IDX_MODEL_NUMBER_VAL,
+
+    DIS_IDX_SERIAL_NUMBER_CHAR,
+    DIS_IDX_SERIAL_NUMBER_VAL,
+
+    DIS_IDX_FW_REVISION_CHAR,
+    DIS_IDX_FW_REVISION_VAL,
+
+    DIS_IDX_NB,
 };
 
 extern void set_zero();
@@ -146,7 +197,6 @@ static const uint16_t weight_scale_svc = ESP_GATT_UUID_WEIGHT_SCALE_SVC;
 /// Device Information Service
 static const uint16_t device_information_svc = ESP_GATT_UUID_DEVICE_INFO_SVC;
 
-#define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t character_declaration_uuid = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t character_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
@@ -209,7 +259,7 @@ static const esp_gatts_attr_db_t weight_scale_gatt_db[WSS_IDX_NB] =
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&weight_measurement_uuid, ESP_GATT_PERM_READ,
-                WSPS_WEIGHT_MEAS_MAX_LEN,0, NULL
+                15,0, NULL
             }
         },
 
@@ -387,25 +437,28 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 
 static void init_weight_control_value(uint8_t* value, uint16_t* len)
 {
-    value[0] = WEIGHT_CONTROL_OPT_READ;           //operation type
-    value[1] = WEIGHT_CONTROL_STATUS_SUCCESS;     //operation status
-    value[2] = config_get_zero_track();
-    value[3] = config_get_alarm_enable();
-    value[4] = config_get_weight_unit();
+    int index=0;
+    value[index++] = WEIGHT_CONTROL_OPT_READ;           //operation type
+    value[index++] = WEIGHT_CONTROL_STATUS_SUCCESS;     //operation status
+    value[index++] = config_get_zero_track();
+    value[index++] = config_get_alarm_enable();
+    value[index++] = config_get_weight_unit();
     uint16_t alarm_time = config_get_alarm_time();
-    value[5] = (uint8_t)(alarm_time>>8);
-    value[6] = (uint8_t)alarm_time;
+    value[index++] = (uint8_t)(alarm_time>>8);
+    value[index++] = (uint8_t)alarm_time;
     uint16_t alarm_weight = config_get_alarm_weight();
-    value[7] = (uint8_t)(alarm_weight>>8);
-    value[8] = (uint8_t)alarm_weight;
+    value[index++] = (uint8_t)(alarm_weight>>8);
+    value[index++] = (uint8_t)alarm_weight;
+    value[index++] = get_battery_level();
+    value[index++] = ws_get_status();
     char* wifi_name = config_get_wifi_name();
     if (wifi_name == NULL) {
-        value[9] = 0;
-        *len = 10;
+        value[index++] = 0;
+        *len = index;
     }else{
-        value[9] = strlen(wifi_name);
-        memcpy(&value[10], wifi_name, value[9]);
-        *len = 10 + value[9];
+        value[index++] = strlen(wifi_name);
+        memcpy(&value[index], wifi_name, strlen(wifi_name));
+        *len = index + strlen(wifi_name);
     }
 }
 
@@ -603,9 +656,39 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
-void ble_send_notification()
+
+static void notify_control_point(uint8_t key, uint8_t value)
 {
-    //ESP_LOGI(GATTS_SERVICE_TAG, "%s(%d, %d, %d)", __func__, displayNum, value, precision);
+    ESP_LOGD(GATTS_SERVICE_TAG, "%s(%d, %d)", __func__, key, value);
+    if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
+
+    uint8_t notify[4];
+    memset(notify, 0, sizeof(notify));
+
+    notify[0] = WEIGHT_CONTROL_OPT_NOTIFY;
+    notify[1] = key;
+    notify[2] = value;
+
+    esp_ble_gatts_send_indicate(
+            weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].gatts_if,
+            weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].conn_id,
+            weight_scale_handle_table[WSS_IDX_WS_CTNL_PT_VAL],
+            sizeof(notify), notify, false);
+}
+
+void bt_notify_wifi_status(uint8_t wifi_status)
+{
+    notify_control_point(WEIGHT_CONTROL_NOTIFY_WIFI, wifi_status);
+}
+
+void bt_notify_battery_level(uint8_t level)
+{
+    notify_control_point(WEIGHT_CONTROL_NOTIFY_BATTERY, level);
+}
+
+static void ble_notify_measurement()
+{
+    //ESP_LOGI(GATTS_SERVICE_TAG, "%s()", __func__);
     if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
 
     uint8_t buffer[9];
@@ -631,7 +714,7 @@ void ble_send_notification()
 void weight_measurement_indicate_loop()
 {
     while(1) {
-        //ble_send_notification();
+        //ble_notify_measurement();
         vTaskDelay(100/portTICK_RATE_MS);
     }
 }

@@ -22,57 +22,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
- * DEFINES
- ****************************************************************************************
- */
-
-#define WSPS_WEIGHT_MEAS_MAX_LEN        (15)
-
-#define HRPS_MANDATORY_MASK             (0x0F)
-#define HRPS_BODY_SENSOR_LOC_MASK       (0x30)
-#define HRPS_HR_CTNL_PT_MASK            (0xC0)
-
-
-///Attributes State Machine
-enum
-{
-    WSS_IDX_SVC,
-
-    WSS_IDX_WS_MEAS_CHAR,
-    WSS_IDX_WS_MEAS_VAL,
-    WSS_IDX_WS_MEAS_NTF_CFG,
-
-    WSS_IDX_WS_FEATURE_CHAR,
-    WSS_IDX_WS_FEATURE_VAL,
-
-    WSS_IDX_WS_CTNL_PT_CHAR,
-    WSS_IDX_WS_CTNL_PT_VAL,
-    WSS_IDX_WS_CTNL_NTF_CFG,
-
-    WSS_IDX_NB,
-};
-
-enum
-{
-    DIS_IDX_SVC,
-    DIS_IDX_MANU_NAME_CHAR,
-    DIS_IDX_MANU_NAME_VAL,
-    
-    DIS_IDX_MODEL_NUMBER_CHAR,
-    DIS_IDX_MODEL_NUMBER_VAL,
-
-    DIS_IDX_SERIAL_NUMBER_CHAR,
-    DIS_IDX_SERIAL_NUMBER_VAL,
-
-    DIS_IDX_FW_REVISION_CHAR,
-    DIS_IDX_FW_REVISION_VAL,
-
-    DIS_IDX_NB,
-};
-
 void bt_init();
 void bt_stop();
 void bt_set_weight(int channel, int32_t value);
+void bt_notify_wifi_status(uint8_t wifi_status);
+void bt_notify_battery_level(uint8_t level);
 
 #endif  /*_GATTS_SERVICE_H*/

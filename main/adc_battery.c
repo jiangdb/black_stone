@@ -11,6 +11,7 @@
 #include "battery.h"
 #include "display.h"
 #include "key_event.h"
+#include "gatts_service.h"
 
 #define ADC1_CHANNEL (6)
 #define ADC1_REF     3650
@@ -45,12 +46,16 @@ void battery_task(void* arg)
 
         if (voltage >= BATTERY_PERCENTAGE_75) {
             setBatteryLevel(BATTERY_LEVEL_3);
+            bt_notify_battery_level(BATTERY_LEVEL_3);
         }else if (voltage >= BATTERY_PERCENTAGE_50) {
             setBatteryLevel(BATTERY_LEVEL_2);
+            bt_notify_battery_level(BATTERY_LEVEL_2);
         }else if (voltage >= BATTERY_PERCENTAGE_25) {
             setBatteryLevel(BATTERY_LEVEL_1);
+            bt_notify_battery_level(BATTERY_LEVEL_1);
         }else if (voltage >= BATTERY_PERCENTAGE_0) {
             setBatteryLevel(BATTERY_LEVEL_EMPTY);
+            bt_notify_battery_level(BATTERY_LEVEL_EMPTY);
         }else{
             key_event_t keyEvent;
             keyEvent.key_type = SLEEP_KEY;
@@ -61,7 +66,7 @@ void battery_task(void* arg)
     }
 }
 
-int get_battery_level()
+uint8_t get_battery_level()
 {
     int voltage = read_voltage();
 
