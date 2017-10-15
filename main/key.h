@@ -23,6 +23,7 @@ void gpio_key_init();
 void gpio_key_start();
 void gpio_key_stop();
 void beap(int wait, int duration);
+void switch_beap_vibrate(bool on);
 bool is_charging();
 
 #endif  /*_BS_KEY_H_*/

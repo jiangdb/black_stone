@@ -16,8 +16,10 @@
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
+#include "config.h"
 #include "display.h"
 #include "battery.h"
+#include "key.h"
 #include "calibration.h"
 #include "queue_buffer.h"
 
@@ -73,6 +75,12 @@
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
 
+enum {
+    ALARM_TIME,
+    ALARM_WEIGHT,
+    ALARM_MAX,
+};
+
 static uint8_t display_data[]={
     COMMAND_ADDRESS_0,
     0,
@@ -114,6 +122,9 @@ static uint8_t battery_levels[] = {
 static spi_device_handle_t spi;
 static TaskHandle_t xHandle = NULL;
 static int iChargingCount = 0;
+static uint8_t sbAlarm = ALARM_MAX;
+static uint32_t currentTime = 0;
+static int32_t siWeights[2] = {0};
 
 /*******************************************************************************
 **
@@ -131,6 +142,9 @@ void setDisplayNumber(uint8_t displayNum, int32_t value)
 {
     int8_t data[DIGITAL_NUMBER];
     int8_t precision;
+
+    //remember value
+    siWeights[displayNum] = value;
 
     // ESP_LOGD(TAG,"setDisplayInteger(%d, %d)!!!\n", displayNum, value);
     if (value >= 99990) { value = 9999; precision=0;}
@@ -196,11 +210,14 @@ void setDisplayTime(uint32_t seconds)
     //max to 1 hr
     if (seconds>3600) seconds = 3600;
 
+    //remember time
+    currentTime = seconds;
+
     uint8_t data[4];
-    int8_t mins = seconds/60;
-    seconds %= 60;
-    data[3] = seconds%10;
-    data[2] = seconds/10;
+    int8_t mins = currentTime/60;
+    currentTime %= 60;
+    data[3] = currentTime%10;
+    data[2] = currentTime/10;
     data[1] = mins%10;
     data[0] = mins/10;
 
@@ -210,6 +227,29 @@ void setDisplayTime(uint32_t seconds)
         if (i==2) {
             display_data[start+i] |= 0x80;
         }
+    }
+
+    if (config_get_alarm_enable() == 1) {
+        uint16_t alarmSeconds = config_get_alarm_time(); 
+        if (seconds == alarmSeconds) {
+            sbAlarm = ALARM_TIME;
+        }
+    }
+}
+
+static void setDisplayTimeOff()
+{
+    int start = 1+DIGITAL_NUMBER*2;
+    for (int i=0; i<4; i++) {
+        display_data[start+i] = 0;
+    }
+}
+
+static void setDisplayNumberOff()
+{
+    int start = 1;
+    for (int i=0; i<DIGITAL_NUMBER*2; i++) {
+        display_data[start+i] = 0;
     }
 }
 
@@ -221,14 +261,21 @@ void setBatteryLevel(int batteryLevel)
     }
 }
 
-void setWifiSound(bool wifi, bool sound)
+void setWifiSound(int wifiSound, bool enable)
 {
-    uint8_t val = 0;
-    if (wifi) {
-        val|=1;
+    uint8_t val = display_data[WIRELESS_ADDRESS];
+    int bit = 0;
+
+    if (wifiSound == 0) {
+        bit = 0;
+    }else{
+        bit = 1;
     }
-    if (sound) {
-        val|=2;
+
+    if (enable) {
+        val |= 1<<bit;
+    }else{
+        val &= (~(1<<bit));
     }
     display_data[WIRELESS_ADDRESS] = val;
 }
@@ -245,7 +292,8 @@ void spi_trassfer_single_byte(const uint8_t data)
     assert(ret==ESP_OK);               //Should have had no issues.
 }
 
-void spi_trassfer_2bytes(const uint8_t command, const uint8_t data) 
+/*
+static void spi_trassfer_2bytes(const uint8_t command, const uint8_t data) 
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -257,8 +305,9 @@ void spi_trassfer_2bytes(const uint8_t command, const uint8_t data)
     ret=spi_device_transmit(spi, &t);  //Transmit!
     assert(ret==ESP_OK);               //Should have had no issues.
 }
+*/
 
-void spi_trassfer_display() 
+static void spi_trassfer_display() 
 {
     esp_err_t ret;
     spi_transaction_t trans[3];        //total 3 transactions
@@ -328,6 +377,54 @@ static void increase_battery_level()
     }
 }
 
+static void display_loop()
+{
+    int alarmCount = 0;
+    while(1) {
+        if (iChargingCount > 0) {
+            if (iChargingCount % 10 == 1) {
+                increase_battery_level();
+            }
+            iChargingCount++;
+        }
+
+        if (sbAlarm == ALARM_TIME) {
+            switch_beap_vibrate(true);
+            setDisplayTimeOff();
+            spi_trassfer_display();
+            vTaskDelay(50/portTICK_RATE_MS);
+            switch_beap_vibrate(false);
+            setDisplayTime(currentTime);
+            spi_trassfer_display();
+            vTaskDelay(50/portTICK_RATE_MS);
+            alarmCount++;
+            if (alarmCount > 2) {
+                sbAlarm = ALARM_MAX;
+                alarmCount = 0;
+            }
+        }else if (sbAlarm == ALARM_WEIGHT) {
+            switch_beap_vibrate(true);
+            setDisplayNumberOff();
+            spi_trassfer_display();
+            vTaskDelay(50/portTICK_RATE_MS);
+            switch_beap_vibrate(false);
+            setDisplayNumber(0, siWeights[0]);
+            setDisplayNumber(1, siWeights[1]);
+            spi_trassfer_display();
+            vTaskDelay(50/portTICK_RATE_MS);
+            alarmCount++;
+            if (alarmCount > 2) {
+                sbAlarm = ALARM_MAX;
+                alarmCount = 0;
+            }
+        }else{
+            spi_trassfer_display();
+            vTaskDelay(100/portTICK_RATE_MS);
+        }
+    }
+}
+
+
 void display_indicate_charging_only()
 {
     clear_display_data();
@@ -347,20 +444,6 @@ void display_disable_charging()
     iChargingCount = 0;
     int level = get_battery_level();
     setBatteryLevel(level);
-}
-
-void display_loop()
-{
-    while(1) {
-        if (iChargingCount > 0) {
-            if (iChargingCount % 10 == 1) {
-                increase_battery_level();
-            }
-            iChargingCount++;
-        }
-        spi_trassfer_display();
-        vTaskDelay(100/portTICK_RATE_MS);
-    }
 }
 
 void display_start()

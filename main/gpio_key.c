@@ -36,6 +36,12 @@ void beap(int wait, int duration)
     gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
 }
 
+void switch_beap_vibrate(bool on)
+{
+    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, on);
+    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, on);
+}
+
 static void beap_vibrate()
 {
     gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);

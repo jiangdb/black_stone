@@ -241,6 +241,7 @@ void config_init()
     //alarm time in seconds
     err = nvs_get_u16(config_handle, KEY_ALARM_TIME, &system_settings.alarm_time);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+    system_settings.alarm_time = 10;
     ESP_LOGI(TAG, "%s: alarm_time: %d", __func__, system_settings.alarm_time);
 
     //alarm weight

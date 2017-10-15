@@ -25,7 +25,7 @@ void display_disable_charging();
 void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
-void setWifiSound(bool wifi, bool sound);
-void spi_trassfer_display();
+void setWifiSound(int wifiSound, bool enable);
+void turnOnAlarm();
 
 #endif  /*_DISPLAY_H_*/

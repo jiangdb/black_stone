@@ -12,6 +12,7 @@
 #include "esp_event_loop.h"
 #include "wifi_service.h"
 #include "gatts_service.h"
+#include "display.h"
 #include "config.h"
 
 #define TAG "WIFI_SERVICE"
@@ -32,6 +33,7 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             if (wifi_status != WIFI_STATUS_CONNECTED) {
                 wifi_status = WIFI_STATUS_CONNECTED;
                 bt_notify_wifi_status(wifi_status);
+                setWifiSound(0, true);
             }
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_GOT_IP");
             ESP_LOGD(TAG, "got ip:%s\n",ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
@@ -40,6 +42,7 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             if (wifi_status != WIFI_STATUS_DISCONNECTED) {
                 wifi_status = WIFI_STATUS_DISCONNECTED;
                 bt_notify_wifi_status(wifi_status);
+                setWifiSound(0, false);
             }
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
             xSemaphoreGive(connectSem);
