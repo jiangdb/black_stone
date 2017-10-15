@@ -66,7 +66,7 @@ void battery_task(void* arg)
             key_event_t keyEvent;
             keyEvent.key_type = SLEEP_KEY;
             keyEvent.key_value = KEY_DOWN;
-            handle_key_event(keyEvent);
+            send_key_event(keyEvent,false);
         }
         vTaskDelay(30000/portTICK_PERIOD_MS);
     }

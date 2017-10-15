@@ -48,6 +48,8 @@ static int key_repeat_count = 0;
 static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
+static xQueueHandle eventQueue;
+static TaskHandle_t xHandle = NULL;
 
 static void lock_display(int channel, bool lock)
 {
@@ -121,85 +123,95 @@ static int count_key_repeat ()
     return key_repeat_count;
 }
 
-void set_zero()
+void send_key_event(key_event_t keyEvent, bool fromIsr)
 {
-    //set zero
-    int32_t adcValue[2];
-    adcValue[0] = spi_adc_get_value();
-    adcValue[1] = gpio_adc_get_value();
-    for (int i = 0; i < 2; ++i)
-    {
-        cal_set_zero(i,adcValue[i]);
-        setDisplayNumber(i, 0);
-        bt_set_weight(i, 0);
+    if (fromIsr) {
+        xQueueSendToBackFromISR(eventQueue, &keyEvent, ( TickType_t ) 0 );
+    }else{
+        xQueueSendToBack(eventQueue, &keyEvent, ( TickType_t ) 0 );
     }
 }
 
-
-void handle_key_event(key_event_t keyEvent)
+static void handle_key_event(void *arg)
 {
-    ESP_LOGD(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
-    switch(work_status) {
-        case WORK_STATUS_CHARGING_SLEEP:
-            if (keyEvent.key_type == NOT_CHARGE_KEY) {
-                charging = false;
-            }else if (keyEvent.key_type == CLEAR_KEY) {
-                if (keyEvent.key_value == KEY_UP) {
-                    no_key_start = false;
+    while(1) {
+        key_event_t keyEvent;
+        xQueueReceive(eventQueue, &keyEvent, portMAX_DELAY);
+
+        ESP_LOGI(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
+        //reset timeout timer
+        bs_timer_reset(TIMER_TIMEOUT);
+        //handle key event
+        switch(work_status) {
+            case WORK_STATUS_CHARGING_SLEEP:
+                if (keyEvent.key_type == NOT_CHARGE_KEY) {
+                    charging = false;
+                }else if (keyEvent.key_type == CLEAR_KEY) {
+                    if (keyEvent.key_value == KEY_UP) {
+                        no_key_start = false;
+                    }
                 }
-            }
-            break;
-        case WORK_STATUS_NORMAL:
-            switch(keyEvent.key_type){
-                case TIMER_KEY:
-                    if (keyEvent.key_value == KEY_DOWN) {
-                        bs_timer_toggle();
-                    }else if (keyEvent.key_value == KEY_HOLD) {
-                        bs_timer_stop();
-                    }
-                    break;
-                case CLEAR_KEY:
-                    if (keyEvent.key_value == KEY_DOWN) {
-                        count_key_repeat();
-                    }else if (keyEvent.key_value == KEY_UP) {
-                        if (trigger_sleep_count >= 1) {
-                            trigger_sleep_count = 0;
-                            // enter_sleep();
-                            done = true;
-                        }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
-                            //do calibration
-                            ESP_LOGD(TAG,"enter calibration mode\n");
-                            beap(0, 400);
-                            work_status = WORK_STATUS_CALIBRATION;
-                        }else if (key_repeat_count == 0){
-                            //set zero
-                            set_zero();
-                            ws_connect("HOME","QWEiop987");
+                break;
+            case WORK_STATUS_NORMAL:
+                switch(keyEvent.key_type){
+                    case TIMER_KEY:
+                        if (keyEvent.key_value == KEY_DOWN) {
+                            bs_timer_toggle(TIMER_STOPWATCH);
+                        }else if (keyEvent.key_value == KEY_HOLD) {
+                            bs_timer_stop(TIMER_STOPWATCH);
                         }
-                    } else if (keyEvent.key_value == KEY_HOLD) {
-                        trigger_sleep_count++;
-                    }
-                    break;
-                case SLEEP_KEY:
-                    done = true;
-                    break;
-                case CHARGE_KEY:
-                    display_indicate_charging();
-                    break;
-                case NOT_CHARGE_KEY:
-                    display_disable_charging();
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case WORK_STATUS_CALIBRATION:
-            if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
-                calibrate_tick = 0;
-            }
-            break;
-        default:
-            break;
+                        break;
+                    case CLEAR_KEY:
+                        if (keyEvent.key_value == KEY_DOWN) {
+                            count_key_repeat();
+                        }else if (keyEvent.key_value == KEY_UP) {
+                            if (trigger_sleep_count >= 1) {
+                                trigger_sleep_count = 0;
+                                // enter_sleep();
+                                done = true;
+                            }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
+                                //do calibration
+                                ESP_LOGD(TAG,"enter calibration mode\n");
+                                beap(0, 400);
+                                work_status = WORK_STATUS_CALIBRATION;
+                            }else if (key_repeat_count == 0){
+                                //set zero
+                                int32_t adcValue[2];
+                                adcValue[0] = spi_adc_get_value();
+                                adcValue[1] = gpio_adc_get_value();
+                                for (int i = 0; i < 2; ++i)
+                                {
+                                    cal_set_zero(i,adcValue[i]);
+                                    setDisplayNumber(i, 0);
+                                    bt_set_weight(i, 0);
+                                }
+                                ws_connect("HOME","QWEiop987");
+                            }
+                        } else if (keyEvent.key_value == KEY_HOLD) {
+                            trigger_sleep_count++;
+                        }
+                        break;
+                    case SLEEP_KEY:
+                        done = true;
+                        break;
+                    case CHARGE_KEY:
+                        display_indicate_charging();
+                        break;
+                    case NOT_CHARGE_KEY:
+                        display_disable_charging();
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            case WORK_STATUS_CALIBRATION:
+                if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
+                    calibrate_tick = 0;
+                }
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -210,17 +222,21 @@ int get_work_status()
 
 void app_main()
 {
-	ESP_LOGI(TAG, "BLACK STONE!!!");
+    ESP_LOGI(TAG, "BLACK STONE!!!");
 
     //init battery first
     battery_init();
+
+    /* start event queue */
+    eventQueue = xQueueCreate(10, sizeof(key_event_t));
+    xTaskCreate(&handle_key_event, "key_event_task", 4096, NULL, 2, &xHandle);
 
     /* Initialise key */
     gpio_key_init();
 
     /* No Power */
     if (!is_charging() && is_battery_extremely_low()) {
-	    ESP_LOGD(TAG, "not charging and battery extremely low\n");
+        ESP_LOGD(TAG, "not charging and battery extremely low\n");
         //enter sleep
         enter_sleep();
     }
@@ -362,9 +378,11 @@ void app_main()
     display_stop();
     spi_adc_shutdown();
     gpio_adc_shutdown();
-    bs_timer_stop();
+    bs_timer_deinit();
     bt_stop();
     ws_stop();
+    gpio_key_stop();
+    if( xHandle != NULL ) vTaskDelete( xHandle );
     battery_stop();
     if (is_charging()) {
         esp_restart();

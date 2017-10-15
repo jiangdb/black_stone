@@ -21,6 +21,7 @@
 
 void gpio_key_init();
 void gpio_key_start();
+void gpio_key_stop();
 void beap(int wait, int duration);
 bool is_charging();
 

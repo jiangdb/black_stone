@@ -28,4 +28,6 @@ typedef struct {
 	int8_t key_value;
 } key_event_t;
 
+void send_key_event(key_event_t keyEvent, bool fromIsr);
+
 #endif  /*_BS_KEY_EVENT_H_*/

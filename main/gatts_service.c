@@ -18,18 +18,18 @@
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-#include "bt.h"
-#include "bta_api.h"
-
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
+#include "nvs_flash.h"
+#include "bt.h"
+#include "bta_api.h"
 #include "gatts_service.h"
 #include "wifi_service.h"
 #include "config.h"
 #include "battery.h"
+#include "key_event.h"
 
 /*
  * DEFINES
@@ -111,8 +111,6 @@ enum
 
     DIS_IDX_NB,
 };
-
-extern void set_zero();
 
 static uint8_t weight_scale_service_uuid[16] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -475,7 +473,12 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
     ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control %d", pData[0]);
     switch(pData[0]) {
         case WEIGHT_CONTROL_SET_ZERO:
-            set_zero();
+            {
+                key_event_t keyEvent;
+                keyEvent.key_type = CLEAR_KEY;
+                keyEvent.key_value = KEY_UP;
+                send_key_event(keyEvent,false);
+            }
             break;
         case WEIGHT_CONTROL_ZERO_TRACK:
             config_set_zero_track(pData[1]);

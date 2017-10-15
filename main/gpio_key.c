@@ -16,13 +16,7 @@
 #include "key_event.h"
 #include "key.h"
 
-/**
- * Externs:
- *
- */
-extern void handle_key_event(key_event_t keyEvent);
-extern int get_work_status();
-
+static TaskHandle_t xHandle = NULL;
 static xQueueHandle gpio_evt_queue = NULL;
 static bool enable_beep_vibrate = false;
 
@@ -82,14 +76,14 @@ static void gpio_key_task(void* arg)
                 key_event_t keyEvent;
                 if (state1 && state2) {
                     keyEvent.key_type = CHARGE_KEY;
-                    handle_key_event(keyEvent);
+                    send_key_event(keyEvent, false);
                 }else if (state2) {
                     keyEvent.key_type = NOT_CHARGE_KEY;
-                    handle_key_event(keyEvent);
+                    send_key_event(keyEvent, false);
                 }else if (state1) {
                 }else{
                     keyEvent.key_type = NOT_CHARGE_KEY;
-                    handle_key_event(keyEvent);
+                    send_key_event(keyEvent, false);
                 }
             }
 
@@ -114,7 +108,7 @@ static void gpio_key_task(void* arg)
                     keyEvent.key_type = CLEAR_KEY;
                     tick[1] = tick_value;
                 }
-                handle_key_event(keyEvent);
+                send_key_event(keyEvent, false);
 
                 if (tick[0] == -1 && tick[1] == -1) {
                     //stop tick
@@ -134,13 +128,24 @@ static void gpio_key_task(void* arg)
                     key_event_t keyEvent;
                     keyEvent.key_value = KEY_HOLD;
                     keyEvent.key_type = (i==0?TIMER_KEY:CLEAR_KEY);
-                    handle_key_event(keyEvent);
+                    send_key_event(keyEvent, false);
                     tick[i] = 1;
                 }
             }
         }
         vTaskDelay(50/portTICK_RATE_MS);
     }
+}
+
+void gpio_key_stop()
+{
+    if( xHandle != NULL )
+    {
+        vTaskDelete( xHandle );
+    }
+    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
+    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
+    enable_beep_vibrate = false;
 }
 
 void gpio_key_start()
@@ -179,7 +184,7 @@ void gpio_key_init()
     //create a queue to handle gpio event from isr
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     //start gpio task
-    xTaskCreate(gpio_key_task, "gpio_key_task", 2048, NULL, 4, NULL);
+    xTaskCreate(gpio_key_task, "gpio_key_task", 2048, NULL, 4, &xHandle);
 
     //install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
