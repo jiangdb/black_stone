@@ -22,6 +22,7 @@
 #include "key.h"
 #include "calibration.h"
 #include "queue_buffer.h"
+#include "bs_timer.h"
 
 /*
  * defines
@@ -77,7 +78,7 @@
 
 enum {
     ALARM_TIME,
-    ALARM_WEIGHT,
+    ALARM_NUMBER,
     ALARM_MAX,
 };
 
@@ -235,6 +236,9 @@ void setDisplayTime(uint32_t seconds)
             sbAlarm = ALARM_TIME;
         }
     }
+
+    //durating work, we do not let system timeout
+    bs_timer_reset(TIMER_TIMEOUT);
 }
 
 static void setDisplayTimeOff()
@@ -280,8 +284,14 @@ void setWifiSound(int wifiSound, bool enable)
     display_data[WIRELESS_ADDRESS] = val;
 }
 
+void alarmNumber()
+{
+    sbAlarm = ALARM_NUMBER;
+}
+
 //Send data to the TA6932. Uses spi_device_transmit, which waits until the transfer is complete.
-void spi_trassfer_single_byte(const uint8_t data) 
+/*
+static void spi_trassfer_single_byte(const uint8_t data) 
 {
     esp_err_t ret;
     spi_transaction_t t;
@@ -292,7 +302,6 @@ void spi_trassfer_single_byte(const uint8_t data)
     assert(ret==ESP_OK);               //Should have had no issues.
 }
 
-/*
 static void spi_trassfer_2bytes(const uint8_t command, const uint8_t data) 
 {
     esp_err_t ret;
@@ -402,7 +411,7 @@ static void display_loop()
                 sbAlarm = ALARM_MAX;
                 alarmCount = 0;
             }
-        }else if (sbAlarm == ALARM_WEIGHT) {
+        }else if (sbAlarm == ALARM_NUMBER) {
             switch_beap_vibrate(true);
             setDisplayNumberOff();
             spi_trassfer_display();

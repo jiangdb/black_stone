@@ -34,6 +34,7 @@ enum {
     WORK_STATUS_CHARGING_SLEEP,
     WORK_STATUS_PRE_NORMAL,
     WORK_STATUS_NORMAL,
+    WORK_STATUS_WORKING,
     WORK_STATUS_CALIBRATION
 };
 
@@ -48,6 +49,7 @@ static int key_repeat_count = 0;
 static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
+static bool alarmed = false;
 static xQueueHandle eventQueue;
 static TaskHandle_t xHandle = NULL;
 
@@ -153,12 +155,16 @@ static void handle_key_event(void *arg)
                 }
                 break;
             case WORK_STATUS_NORMAL:
+            case WORK_STATUS_WORKING:
                 switch(keyEvent.key_type){
                     case TIMER_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
-                            bs_timer_toggle(TIMER_STOPWATCH);
+                            bool started = bs_timer_toggle(TIMER_STOPWATCH);
+                            if (started) work_status = WORK_STATUS_WORKING;
+                            else work_status = WORK_STATUS_NORMAL;
                         }else if (keyEvent.key_value == KEY_HOLD) {
                             bs_timer_stop(TIMER_STOPWATCH);
+                            work_status = WORK_STATUS_NORMAL;
                         }
                         break;
                     case CLEAR_KEY:
@@ -169,12 +175,12 @@ static void handle_key_event(void *arg)
                                 trigger_sleep_count = 0;
                                 // enter_sleep();
                                 done = true;
-                            }else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
+                            } else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
                                 //do calibration
                                 ESP_LOGD(TAG,"enter calibration mode\n");
                                 beap(0, 400);
                                 work_status = WORK_STATUS_CALIBRATION;
-                            }else if (key_repeat_count == 0){
+                            } else if (key_repeat_count == 0) {
                                 //set zero
                                 int32_t adcValue[2];
                                 adcValue[0] = spi_adc_get_value();
@@ -185,7 +191,6 @@ static void handle_key_event(void *arg)
                                     setDisplayNumber(i, 0);
                                     bt_set_weight(i, 0);
                                 }
-                                ws_connect("HOME","QWEiop987");
                             }
                         } else if (keyEvent.key_value == KEY_HOLD) {
                             trigger_sleep_count++;
@@ -317,7 +322,7 @@ void app_main()
 
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
-        if (work_status == WORK_STATUS_NORMAL) {
+        if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
             int32_t adcValue[2];
             adcValue[0] = spi_adc_get_value();
             adcValue[1] = gpio_adc_get_value();
@@ -349,6 +354,18 @@ void app_main()
                     }
                 }
                 if (!display_lock[i] || tracked) {
+                    //check if we need do alarm
+                    if (i==1 && (work_status == WORK_STATUS_WORKING) && (config_get_alarm_enable()==1)) {
+                        uint16_t alarmWeight = config_get_alarm_weight(); 
+                        if (weight[i] >= alarmWeight) {
+                            if (!alarmed ) {
+                                alarmNumber();
+                                alarmed = true;
+                            }
+                        }else{
+                            alarmed = false;
+                        }
+                    }
                     setDisplayNumber(i, weight[i]);
                     bt_set_weight(i, weight[i]);
                 }

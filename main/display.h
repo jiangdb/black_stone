@@ -26,6 +26,6 @@ void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(int wifiSound, bool enable);
-void turnOnAlarm();
+void alarmNumber();
 
 #endif  /*_DISPLAY_H_*/

@@ -128,8 +128,8 @@ bool config_set_alarm_time(uint16_t timeInSeconds)
 
 uint16_t config_get_alarm_weight()
 {
-    //TODO need handle weight unit
-    return system_settings.alarm_weight;
+    //TODO need handle weight unit, default consider as g, and return in mg
+    return system_settings.alarm_weight * 10;
 }
 
 bool config_set_alarm_weight(uint16_t weight)
@@ -241,7 +241,6 @@ void config_init()
     //alarm time in seconds
     err = nvs_get_u16(config_handle, KEY_ALARM_TIME, &system_settings.alarm_time);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
-    system_settings.alarm_time = 10;
     ESP_LOGI(TAG, "%s: alarm_time: %d", __func__, system_settings.alarm_time);
 
     //alarm weight
