@@ -265,6 +265,7 @@ void setBatteryLevel(int batteryLevel)
     }
 }
 
+//wifiSound 0 for wifi, 1 for Sound
 void setWifiSound(int wifiSound, bool enable)
 {
     uint8_t val = display_data[WIRELESS_ADDRESS];
@@ -459,6 +460,12 @@ void display_start()
 {
     //reset display time
     setDisplayTime(0);
+    //setDisplayNumber(0,0);        //default single scale
+    setDisplayNumber(1,0);
+
+    if (config_get_alarm_enable()) {
+        setWifiSound(1,1);
+    }
 
     //Create task
     xTaskCreate(&display_loop, "display_task", 2048, NULL, 5, &xHandle);
