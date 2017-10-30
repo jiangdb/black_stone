@@ -77,6 +77,12 @@ int32_t convert_weight(int8_t channel, int32_t adcValue, bool abs)
     }else{
         weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     }
+
+    uint8_t weight_unit = config_get_weight_unit();
+    if (weight_unit == WEIGHT_UNIT_OZ) {
+        weight = (weight*100)/2835;
+    }
+
     if (weight >= 100000 || weight <= -10000) {
         return (weight+50)/10;
     } else{

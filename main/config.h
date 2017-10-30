@@ -8,7 +8,7 @@
 
 typedef enum{
     WEIGHT_UNIT_G,
-    WEIGHT_UNIT_KG,
+    WEIGHT_UNIT_OZ,
 }weight_unit_e;
 
 void config_init();

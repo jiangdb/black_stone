@@ -128,7 +128,7 @@ bool config_set_alarm_time(uint16_t timeInSeconds)
 
 uint16_t config_get_alarm_weight()
 {
-    //TODO need handle weight unit, default consider as g, and return in mg
+    //should be consistant with unit;
     return system_settings.alarm_weight * 10;
 }
 

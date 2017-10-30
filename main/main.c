@@ -27,7 +27,8 @@
 
 #define GPIO_LED_IO                 19
 #define DISPLAY_LOCK_THRESHOLD      15      //1.5g
-#define DOUBLE_SCALE_THRESHOLD      500     //50g
+#define DOUBLE_SCALE_THRESHOLD_G    500     //50g
+#define DOUBLE_SCALE_THRESHOLD_OZ   17      //1.7oz
 #define REPEAT_COUNT_CALIBRATION    6
 
 enum {
@@ -189,7 +190,8 @@ static void handle_key_event(void *arg)
                                 beap(0, 400);
                                 work_status = WORK_STATUS_CALIBRATION;
                             } else if (key_repeat_count == 0) {
-                                //set zero
+                                //delay 1s before set zero
+                                //vTaskDelay(1000/portTICK_RATE_MS);
                                 int32_t adcValue;
                                 if (doubleScale) {
                                     adcValue = gpio_adc_get_value();
@@ -383,7 +385,9 @@ void app_main()
             int32_t upAdcValue = gpio_adc_get_value();
             if (!doubleScale) {
                 int32_t absWeight = convert_weight(0, upAdcValue, true);
-                if (absWeight > DOUBLE_SCALE_THRESHOLD) {
+                uint8_t weightUnit = config_get_weight_unit();
+                if (((weightUnit == WEIGHT_UNIT_G) && (absWeight > DOUBLE_SCALE_THRESHOLD_G))
+                        || ((weightUnit == WEIGHT_UNIT_OZ) && (absWeight > DOUBLE_SCALE_THRESHOLD_OZ))) {
                     doubleScale = true;
                 }
             }
