@@ -176,13 +176,13 @@ typedef union {
         uint8_t userid_present:         1;                /* User ID present: 0 false 1 true */
         uint8_t timestamp_present:      1;                /* Time stamp present: 0 false 1 true */
         uint8_t measurement_units:      1;                /* Measurement Units: 0 SI 1 Imperial*/
-        uint8_t total_present:          1;                /* Custom: 0 false, 1 true*/
+        uint8_t two_channel:            1;                /* Custom: 0 single channel, 1 two channel*/
         uint8_t reserved:               3;                /* Reserved */
     };
     uint8_t val;
 } weight_measurement_flags_t;
 
-static int32_t weight_value[2] = {0,0};
+static int32_t weight_value[2] = {-1,0};
 static TaskHandle_t xHandle = NULL;
 static SemaphoreHandle_t connectedSem = NULL;
 
@@ -695,25 +695,30 @@ void bt_notify_battery_level(uint8_t level)
 static void ble_notify_measurement()
 {
     //ESP_LOGI(GATTS_SERVICE_TAG, "%s()", __func__);
-    //if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
     uint8_t buffer[9];
+    size_t bufferSize = 5;
     weight_measurement_flags_t flag = {
         .bmi_height_present = 0,
         .userid_present = 0,
         .timestamp_present = 0,
         .measurement_units = 0,
-        .total_present = 1,
+        .two_channel = 0,
         .reserved = 0,
     };
     buffer[0] = flag.val;
-    memcpy(&buffer[1], &weight_value[0], sizeof(int32_t));
-    memcpy(&buffer[5], &weight_value[1], sizeof(int32_t));
+    memcpy(&buffer[1], &weight_value[1], sizeof(int32_t));
+
+    if (weight_value[0] != -1) {
+        flag.two_channel = 1;
+        memcpy(&buffer[5], &weight_value[0], sizeof(int32_t));
+        bufferSize = sizeof(buffer);
+    }
 
     esp_ble_gatts_send_indicate(
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].gatts_if,
             weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].conn_id,
             weight_scale_handle_table[WSS_IDX_WS_MEAS_VAL],
-            sizeof(buffer), buffer, false);
+            bufferSize, buffer, false);
 }
 
 void weight_measurement_indicate_loop()
