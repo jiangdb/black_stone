@@ -53,7 +53,6 @@ static void beap_vibrate()
 
 bool is_charging()
 {
-    return true;
     int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
     int state2 = gpio_get_level(GPIO_INPUT_IO_STATE2);
 
@@ -197,8 +196,8 @@ void gpio_key_init()
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_LEFT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_LEFT);
     gpio_isr_handler_add(GPIO_INPUT_IO_KEY_RIGHT, gpio_isr_handler, (void*) GPIO_INPUT_IO_KEY_RIGHT);
-    //gpio_isr_handler_add(GPIO_INPUT_IO_STATE1, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE1);
-    //gpio_isr_handler_add(GPIO_INPUT_IO_STATE2, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE2);
+    gpio_isr_handler_add(GPIO_INPUT_IO_STATE1, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE1);
+    gpio_isr_handler_add(GPIO_INPUT_IO_STATE2, gpio_isr_handler, (void*) GPIO_INPUT_IO_STATE2);
 
     //set output level
     gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
