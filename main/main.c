@@ -22,6 +22,7 @@
 #include "gpio_adc.h"
 #include "config.h"
 #include "zero_track.h"
+#include "ota_service.h"
 
 #define TAG  "MAIN"
 
@@ -37,7 +38,8 @@ enum {
     WORK_STATUS_PRE_NORMAL,
     WORK_STATUS_NORMAL,
     WORK_STATUS_WORKING,
-    WORK_STATUS_CALIBRATION
+    WORK_STATUS_CALIBRATION,
+    WORK_STATUS_SHUTDOWN,
 };
 
 enum {
@@ -50,6 +52,7 @@ static int calibrate_tick = -1;
 static int calibrate_index = 0;
 static bool display_lock[2] = {false, false};
 static int display_lock_count[2] = {0,0};
+static int set_zero_count = -1;
 static int32_t last_weight[2] = {0,0};
 static bool done = false;
 static int trigger_sleep_count = 0;
@@ -123,8 +126,8 @@ static int count_key_repeat ()
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
 
-    //consider 500ms (240000*500) as 
-    if ( diff < 120000000 ) {
+    //consider 300ms (240000*300) as 
+    if ( diff < 72000000 ) {
         key_repeat_count++;
     } else {
         key_repeat_count = 0;
@@ -178,7 +181,12 @@ static void handle_key_event(void *arg)
                         break;
                     case CLEAR_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
-                            count_key_repeat();
+                            int count = count_key_repeat();
+                            ESP_LOGD(TAG,"count %d\n", count);
+                            if (count >0 ) {
+                                //we got repeat key
+                                set_zero_count = 0; 
+                            }
                         }else if (keyEvent.key_value == KEY_UP) {
                             if (trigger_sleep_count >= 1) {
                                 trigger_sleep_count = 0;
@@ -187,28 +195,19 @@ static void handle_key_event(void *arg)
                             } else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
                                 //do calibration
                                 ESP_LOGD(TAG,"enter calibration mode\n");
+                                vTaskDelay(300/portTICK_RATE_MS);
                                 beap(0, 400);
                                 work_status = WORK_STATUS_CALIBRATION;
                             } else if (key_repeat_count == 0) {
-                                //delay 1s before set zero
-                                //vTaskDelay(1000/portTICK_RATE_MS);
-                                int32_t adcValue;
-                                if (doubleScale) {
-                                    adcValue = gpio_adc_get_value();
-                                    cal_set_zero(0, adcValue);
-                                    setDisplayNumber(0, 0);
-                                    bt_set_weight(0, 0);
-                                }
-                                adcValue = spi_adc_get_value();
-                                cal_set_zero(1, adcValue);
-                                setDisplayNumber(1, 0);
-                                bt_set_weight(1, 0);
+                                //start count for set zero
+                                set_zero_count = 0; 
                             }
                         } else if (keyEvent.key_value == KEY_HOLD) {
                             trigger_sleep_count++;
                         }
                         break;
                     case SLEEP_KEY:
+                    case FIRMWARE_UPGRADE_KEY:
                         done = true;
                         break;
                     case CHARGE_KEY:
@@ -225,6 +224,9 @@ static void handle_key_event(void *arg)
                 if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
                     calibrate_tick = 0;
                 }
+                break;
+            case WORK_STATUS_SHUTDOWN:
+                done = true;
                 break;
             default:
                 break;
@@ -287,6 +289,8 @@ static int32_t processAdcValue(int channel, int32_t value, int32_t weightAddValu
 void app_main()
 {
     ESP_LOGI(TAG, "BLACK STONE!!!");
+    ESP_LOGI(TAG, "version: %s", FW_VERSION);
+    ESP_LOGI(TAG, "model: %s", MODEL_NUMBER);
 
     //init battery first
     battery_init();
@@ -395,57 +399,23 @@ void app_main()
             if (doubleScale) {
                 upWight = processAdcValue(UP_SCALE, upAdcValue, 0);
             }
-            processAdcValue(DOWN_SCALE, spi_adc_get_value(), upWight);
-
-            /*
-            int32_t adcValue[SCALE_NUM];
-            adcValue[UP_SCALE] = gpio_adc_get_value();
-            adcValue[DOWN_SCALE] = spi_adc_get_value();
-            int32_t weight[2];
-            for (int i = 0; i < 2; ++i)
-            {
-                weight[i] = convert_weight(i, adcValue[i], false);
-
-                // auto track zero
-                bool tracked = zero_track(i, adcValue[i], weight[i], 100);
-                if (tracked) weight[i] = 0;
-
-                if (i == 1) weight[i]+=weight[0];
-                // change more than 1.5g, unlock display
-                if (display_lock[i] && (abs(last_weight[i]-weight[i]) > DISPLAY_LOCK_THRESHOLD)) {
-                    lock_display(i, false);
-                    last_weight[i] = weight[i];
-                }else if (!display_lock[i]) {
-                    // change more than 0.5g, clear count
-                    if (abs(last_weight[i]-weight[i]) > 5){
-                        display_lock_count[i] = 0;
-                        last_weight[i] = weight[i];
-                    }else{
-                        display_lock_count[i]++;
-                        //3s not change, lock display
-                        if (display_lock_count[i] == 30) {
-                            lock_display(i, true);
-                        }
+            int32_t downAdcValue = spi_adc_get_value();
+            processAdcValue(DOWN_SCALE, downAdcValue, upWight);
+            //need hanlde zero
+            if (set_zero_count >= 0 ) {
+                set_zero_count++;
+                if (set_zero_count > 10) {
+                    if (doubleScale) {
+                        cal_set_zero(0, upAdcValue);
+                        setDisplayNumber(0, 0);
+                        bt_set_weight(0, 0);
                     }
+                    cal_set_zero(1, downAdcValue);
+                    setDisplayNumber(1, 0);
+                    bt_set_weight(1, 0);
+                    set_zero_count = -1;
                 }
-                if (!display_lock[i] || tracked) {
-                    //check if we need do alarm
-                    if (i==1 && (work_status == WORK_STATUS_WORKING) && (config_get_alarm_enable()==1)) {
-                        uint16_t alarmWeight = config_get_alarm_weight(); 
-                        if (weight[i] >= alarmWeight) {
-                            if (!alarmed ) {
-                                alarmNumber();
-                                alarmed = true;
-                            }
-                        }else{
-                            alarmed = false;
-                        }
-                    }
-                    setDisplayNumber(i, weight[i]);
-                    bt_set_weight(i, weight[i]);
-                }
-            }
-            */
+            } 
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
             if (calibrate_tick >= 20) {
@@ -467,12 +437,25 @@ void app_main()
     }
 
     ESP_LOGD(TAG,"quit main loop\n");
+    work_status = WORK_STATUS_SHUTDOWN;
 
-    display_stop();
     spi_adc_shutdown();
     gpio_adc_shutdown();
     bs_timer_deinit();
     bt_stop();
+    //check ota
+    if (ws_get_status() != WIFI_STATUS_CONNECTED) {
+        firmware_t* firmware = config_get_firmware_upgrade();
+        if (firmware->host != NULL) {
+            if (!ota_task(firmware)){
+                done = false;
+                while(!done) {
+                    vTaskDelay(100/portTICK_RATE_MS);
+                }
+            }
+        }
+    }
+    display_stop();
     ws_stop();
     gpio_key_stop();
     if( xHandle != NULL ) vTaskDelete( xHandle );

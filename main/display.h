@@ -15,6 +15,11 @@ enum {
     BATTERY_LEVEL_3
 };
 
+enum {
+    OPERATION_CALIBRATION,
+    OPERATION_UPGRADE,
+};
+
 void display_init();
 void display_start();
 void display_stop();
@@ -26,6 +31,8 @@ void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(int wifiSound, bool enable);
+void setOpation(int opation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
+void setError(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
 void alarmNumber();
 
 #endif  /*_DISPLAY_H_*/

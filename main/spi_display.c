@@ -72,6 +72,9 @@
 #define NUMBER_OFF              0x00
 #define OPT_DASH                0x40
 
+#define CHAR_C                  0x39
+#define CHAR_E                  0x79
+
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
@@ -126,6 +129,8 @@ static int iChargingCount = 0;
 static uint8_t sbAlarm = ALARM_MAX;
 static uint32_t currentTime = 0;
 static int32_t siWeights[2] = {0};
+
+static void clear_display_data(bool leaveBattery);
 
 /*******************************************************************************
 **
@@ -285,6 +290,71 @@ void setWifiSound(int wifiSound, bool enable)
     display_data[WIRELESS_ADDRESS] = val;
 }
 
+void setOpation(int opation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
+{
+    clear_display_data(true);
+    int timerPos = 1+DIGITAL_NUMBER*2;
+    int digitPos = 1+DIGITAL_NUMBER;
+    switch(opation) {
+        case OPERATION_CALIBRATION:
+            // show C0 at timer
+            timerPos+=2;        //start from the third digit
+            display_data[timerPos++] = CHAR_C;
+            display_data[timerPos] = NUMBER_0;
+            break;
+        case OPERATION_UPGRADE:
+            // show C1 at timer
+            timerPos+=2;        //start from the third digit
+            display_data[timerPos++] = CHAR_C;
+            display_data[timerPos] = NUMBER_1;
+            break;
+        default:
+            return;
+            break;
+    }
+
+    if (d0 < 10) {
+        display_data[digitPos] = numbers[d0];
+    }
+    digitPos++;
+    if (d1 < 10) {
+        display_data[digitPos] = numbers[d1];
+    }
+    digitPos++;
+    if (d2 < 10) {
+        display_data[digitPos] = numbers[d2];
+    }
+    digitPos++;
+    if (d3 < 10) {
+        display_data[digitPos] = numbers[d3];
+    }
+}
+
+void setError(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
+{
+    clear_display_data(true);
+    int timerPos = 1+DIGITAL_NUMBER*2+3;
+    int digitPos = 1+DIGITAL_NUMBER;
+    // show E at timer
+    display_data[timerPos] = CHAR_E;
+
+    if (d0 < 10) {
+        display_data[digitPos] = numbers[d0];
+    }
+    digitPos++;
+    if (d1 < 10) {
+        display_data[digitPos] = numbers[d1];
+    }
+    digitPos++;
+    if (d2 < 10) {
+        display_data[digitPos] = numbers[d2];
+    }
+    digitPos++;
+    if (d3 < 10) {
+        display_data[digitPos] = numbers[d3];
+    }
+}
+
 void alarmNumber()
 {
     sbAlarm = ALARM_NUMBER;
@@ -352,10 +422,11 @@ static void spi_trassfer_display()
 
 }
 
-static void clear_display_data()
+static void clear_display_data(bool leaveBattery)
 {
     for (int i = 1; i < sizeof(display_data); ++i)
     {
+        if (leaveBattery && i == BATTERY_ADDRESS) continue;
         display_data[i] = 0;
     }
 }
@@ -363,13 +434,13 @@ static void clear_display_data()
 void display_indicate_charge_only()
 {
     int count = 6;
-    clear_display_data();
+    clear_display_data(false);
 
     while(count > 0) {
         if (count%2 == 0) {
             setBatteryLevel(BATTERY_LEVEL_EMPTY);
         }else{
-            clear_display_data();
+            clear_display_data(false);
         }
 
         spi_trassfer_display();
@@ -437,7 +508,7 @@ static void display_loop()
 
 void display_indicate_charging_only()
 {
-    clear_display_data();
+    clear_display_data(false);
     increase_battery_level();
     spi_trassfer_display();
 }
@@ -455,6 +526,7 @@ void display_disable_charging()
     int level = get_battery_level();
     setBatteryLevel(level);
 }
+
 
 void display_start()
 {
@@ -478,7 +550,7 @@ void display_stop()
         vTaskDelete( xHandle );
     }
 
-    clear_display_data();
+    clear_display_data(false);
     spi_trassfer_display();
 }
 

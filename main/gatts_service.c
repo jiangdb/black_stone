@@ -220,13 +220,9 @@ static const uint8_t weight_scale_ctrl_point_uuid[16] = {0x00,0x00,0x00,0x00,0x0
 static const uint8_t weight_scale_ctrl_point_ccc[2] = {0x00, 0x00};
 
 static const uint16_t manufacturer_name_uuid = ESP_GATT_UUID_MANU_NAME;
-
 static const uint16_t model_number_uuid = ESP_GATT_UUID_MODEL_NUMBER_STR;
-static const uint8_t model_number_val[4] = {'0','1','0','1'};
-
 static const uint16_t serial_number_uuid = ESP_GATT_UUID_SERIAL_NUMBER_STR;
 static uint8_t serial_number_val[13] = {0};
-
 static const uint16_t firmware_revision_uuid = ESP_GATT_UUID_FW_VERSION_STR;
 
 /// Full WSS Database Description - Used to add attributes into the database
@@ -370,7 +366,7 @@ static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
             {ESP_GATT_AUTO_RSP},
             {
                 ESP_UUID_LEN_16, (uint8_t *)&model_number_uuid, ESP_GATT_PERM_READ,
-                10, sizeof(model_number_val), (uint8_t *)model_number_val
+                50, strlen(MODEL_NUMBER), (uint8_t *)MODEL_NUMBER
             }
         },
 
@@ -511,6 +507,19 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
             }
             break;
         case WEIGHT_CONTROL_FW_UPGRADE:
+            {
+                uint8_t host_len = pData[1];
+                config_set_wifi_name((char*)&pData[2],host_len);
+                uint16_t port_offset = 2+host_len;
+                uint8_t port = pData[port_offset];
+                uint16_t path_offset = port_offset+1;
+                uint8_t path_len = pData[path_offset++];
+                config_set_firmware_upgrade((char*)&pData[2],host_len, port, (char*)&pData[path_offset],path_len);
+                key_event_t keyEvent;
+                keyEvent.key_type = FIRMWARE_UPGRADE_KEY;
+                keyEvent.key_value = KEY_UP;
+                send_key_event(keyEvent,false);
+            }
             break;
         default:
             ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])

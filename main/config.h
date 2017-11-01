@@ -4,12 +4,20 @@
 #include <stdio.h>
 
 #define MANUFACTURER            "Timemore" 
-#define FW_VERSION              "0.90.01"
+#define FW_VERSION              "0.80.01"
+//#define MODEL_NUMBER            "TES03PL"       //single scale
+#define MODEL_NUMBER            "TES04PL"       //double scale
 
 typedef enum{
     WEIGHT_UNIT_G,
     WEIGHT_UNIT_OZ,
 }weight_unit_e;
+
+typedef struct {
+    char* host;
+    uint8_t port;
+    char* path;
+}firmware_t;
 
 void config_init();
 void config_close();
@@ -39,6 +47,9 @@ char* config_get_wifi_name();
 bool config_set_wifi_name(char* name, size_t len);
 
 char* config_get_wifi_pass();
-bool config_set_wifi_pass(char* name, size_t len);
+bool config_set_wifi_pass(char* pass, size_t len);
+
+firmware_t* config_get_firmware_upgrade();
+bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, char* path, uint8_t path_len);
 
 #endif  /*_BS_CONFIG_H_*/

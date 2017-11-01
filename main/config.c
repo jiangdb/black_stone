@@ -41,6 +41,7 @@ typedef struct {
     uint8_t weight_unit;
     char* wifi_name;
     char* wifi_pass;
+    firmware_t firmware;
 }system_settings_t;
 
 static nvs_handle config_handle;
@@ -190,6 +191,28 @@ bool config_set_wifi_pass(char* pass, size_t len)
     return err == ESP_OK;
 }
 
+firmware_t* config_get_firmware_upgrade()
+{
+    return &system_settings.firmware;
+}
+
+bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, char* path, uint8_t path_len)
+{
+    free(system_settings.firmware.host);
+    free(system_settings.firmware.path);
+    system_settings.firmware.host = malloc(host_len);
+    system_settings.firmware.path = malloc(path_len);
+    memset(system_settings.firmware.host, 0, host_len+1);      //make sure end up with 0
+    memset(system_settings.firmware.path, 0, path_len+1);      //make sure end up with 0
+    memcpy(system_settings.firmware.host, host, host_len);
+    memcpy(system_settings.firmware.path, path, path_len);
+    system_settings.firmware.port = port;
+
+    ESP_LOGD(TAG, "%s set firmware host: %s, port: %d, path:%s\n", 
+            __func__, system_settings.firmware.host, system_settings.firmware.port, system_settings.firmware.path);
+    return true;
+}
+
 void config_close()
 {
     free(system_settings.wifi_name);
@@ -227,6 +250,8 @@ void config_init()
 
     //System Setting
     memset(&system_settings,0,sizeof(system_settings));
+    system_settings.firmware.host = NULL;
+    system_settings.firmware.path = NULL;
 
     //zero track enable
     err = nvs_get_u8(config_handle, KEY_ZERO_TRACK, &system_settings.zero_track);
