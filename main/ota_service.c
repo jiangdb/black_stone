@@ -96,7 +96,7 @@ static bool read_past_http_header(char text[], int total_len, esp_ota_handle_t u
                 ESP_LOGE(TAG, "Error: esp_ota_write failed! err=0x%x", err);
                 return false;
             } else {
-                ESP_LOGI(TAG, "esp_ota_write header OK");
+                ESP_LOGD(TAG, "esp_ota_write header OK");
                 binary_file_length += i_write_len;
             }
             return true;
@@ -133,7 +133,7 @@ static bool connect_to_http_server(firmware_t* firmware)
         return false;
     }
     ip4_addr = (struct ip4_addr *)hp->h_addr;
-    ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*ip4_addr));
+    ESP_LOGD(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*ip4_addr));
 
     // set connect info
     memset(&sock_info, 0, sizeof(struct sockaddr_in));
