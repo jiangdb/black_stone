@@ -27,11 +27,13 @@ void display_indicate_charge_only();
 void display_indicate_charging_only();
 void display_indicate_charging();
 void display_disable_charging();
+void display_backup();
+void display_restore();
 void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(int wifiSound, bool enable);
-void setOpation(int opation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
+void display_setOperation(int opation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
 void setError(uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3);
 void alarmNumber();
 

@@ -113,11 +113,6 @@ static bool connect_to_http_server(firmware_t* firmware)
     struct hostent *hp;
     struct ip4_addr *ip4_addr;
 
-    if (firmware == NULL) {
-        ESP_LOGE(TAG, "wrong firmware link");
-        return false;
-    }
-
     ESP_LOGD(TAG, "create socket");
     socket_id = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_id == -1) {
@@ -148,7 +143,7 @@ static bool connect_to_http_server(firmware_t* firmware)
         close(socket_id);
         return false;
     } else {
-        ESP_LOGI(TAG, "Connected to server");
+        ESP_LOGD(TAG, "Connected to http server");
         return true;
     }
     return false;
@@ -174,11 +169,14 @@ bool ota_task(firmware_t* firmware)
     ESP_LOGD(TAG, "Running partition type %d subtype %d (offset 0x%08x)",
              configured->type, configured->subtype, configured->address);
 
+    if (firmware == NULL) {
+        ESP_LOGE(TAG, "wrong firmware link");
+        task_fatal_error();
+        return false;
+    }
+
     /*connect to http server*/
-    if (connect_to_http_server(firmware)) {
-        ESP_LOGD(TAG, "Connected to http server");
-    } else {
-        ESP_LOGE(TAG, "Connect to http server failed!");
+    if (!connect_to_http_server(firmware)) {
         task_fatal_error();
         return false;
     }
@@ -208,7 +206,7 @@ bool ota_task(firmware_t* firmware)
         return false;
     }
     ESP_LOGD(TAG, "esp_ota_begin succeeded");
-    setOpation(OPERATION_UPGRADE, 255, 255, 255, 0);
+    display_setOperation(OPERATION_UPGRADE, 255, 255, 255, 0);
 
     bool resp_body_start = false, flag = true;
     int percentage = 0;
@@ -238,9 +236,9 @@ bool ota_task(firmware_t* firmware)
                 percentage = per;
                 ESP_LOGD(TAG, "Have written image length %d%%", percentage);
                 if (percentage != 100) {
-                    setOpation(OPERATION_UPGRADE, 255, 255, percentage/10, 0);
+                    display_setOperation(OPERATION_UPGRADE, 255, 255, percentage/10, 0);
                 }else{
-                    setOpation(OPERATION_UPGRADE, 255, 255, 9, 5);
+                    display_setOperation(OPERATION_UPGRADE, 255, 255, 9, 5);
                 }
             }
         } else if (buff_len == 0) {  /*packet over*/
@@ -253,7 +251,7 @@ bool ota_task(firmware_t* firmware)
     }
 
     ESP_LOGI(TAG, "Total Write binary data length : %d", binary_file_length);
-    setOpation(OPERATION_UPGRADE, 255, 1, 0, 0);
+    display_setOperation(OPERATION_UPGRADE, 255, 1, 0, 0);
 
     if (esp_ota_end(update_handle) != ESP_OK) {
         ESP_LOGE(TAG, "esp_ota_end failed!");

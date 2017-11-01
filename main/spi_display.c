@@ -102,6 +102,7 @@ static uint8_t display_data[]={
     0,
     0,
 };
+static uint8_t* display_data_bak = NULL;
 
 static uint8_t numbers[] = {
     NUMBER_0,
@@ -290,12 +291,12 @@ void setWifiSound(int wifiSound, bool enable)
     display_data[WIRELESS_ADDRESS] = val;
 }
 
-void setOpation(int opation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
+void display_setOperation(int operation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
 {
     clear_display_data(true);
     int timerPos = 1+DIGITAL_NUMBER*2;
     int digitPos = 1+DIGITAL_NUMBER;
-    switch(opation) {
+    switch(operation) {
         case OPERATION_CALIBRATION:
             // show C0 at timer
             timerPos+=2;        //start from the third digit
@@ -527,6 +528,28 @@ void display_disable_charging()
     setBatteryLevel(level);
 }
 
+void display_backup()
+{
+    if (display_data_bak != NULL) return;
+
+    display_data_bak = malloc(sizeof(display_data)); 
+    for (int i = 1; i < sizeof(display_data); ++i)
+    {
+        display_data_bak[i] = display_data[i];
+    }
+}
+
+void display_restore()
+{
+    if (display_data_bak == NULL) return;
+
+    for (int i = 1; i < sizeof(display_data); ++i)
+    {
+        display_data[i] = display_data_bak[i];
+    }
+    free(display_data_bak);
+    display_data_bak = NULL;
+}
 
 void display_start()
 {

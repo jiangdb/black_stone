@@ -126,8 +126,8 @@ static int count_key_repeat ()
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
 
-    //consider 300ms (240000*300) as 
-    if ( diff < 72000000 ) {
+    //consider 500ms (240000*500) as 
+    if ( diff < 120000000 ) {
         key_repeat_count++;
     } else {
         key_repeat_count = 0;
@@ -152,7 +152,7 @@ static void handle_key_event(void *arg)
         key_event_t keyEvent;
         xQueueReceive(eventQueue, &keyEvent, portMAX_DELAY);
 
-        ESP_LOGI(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
+        ESP_LOGD(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
         //reset timeout timer
         bs_timer_reset(TIMER_TIMEOUT);
         //handle key event
@@ -181,11 +181,12 @@ static void handle_key_event(void *arg)
                         break;
                     case CLEAR_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
-                            int count = count_key_repeat();
-                            ESP_LOGD(TAG,"count %d\n", count);
-                            if (count >0 ) {
-                                //we got repeat key
-                                set_zero_count = 0; 
+                            if (work_status == WORK_STATUS_NORMAL) {
+                                int count = count_key_repeat();
+                                if (count > 0 ) {
+                                    //we got repeat key
+                                    set_zero_count = 0; 
+                                }
                             }
                         }else if (keyEvent.key_value == KEY_UP) {
                             if (trigger_sleep_count >= 1) {
@@ -193,11 +194,17 @@ static void handle_key_event(void *arg)
                                 // enter_sleep();
                                 done = true;
                             } else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
-                                //do calibration
-                                ESP_LOGD(TAG,"enter calibration mode\n");
-                                vTaskDelay(300/portTICK_RATE_MS);
-                                beap(0, 400);
-                                work_status = WORK_STATUS_CALIBRATION;
+                                if (work_status == WORK_STATUS_NORMAL) {
+                                    set_zero_count = -1; 
+                                    //do calibration
+                                    ESP_LOGD(TAG,"enter calibration mode\n");
+                                    beap(100, 200);
+                                    beap(100, 400);
+                                    work_status = WORK_STATUS_CALIBRATION;
+                                    display_backup();
+                                    display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, 3);
+                                    count_key_repeat();
+                                }
                             } else if (key_repeat_count == 0) {
                                 //start count for set zero
                                 set_zero_count = 0; 
@@ -222,7 +229,9 @@ static void handle_key_event(void *arg)
                 break;
             case WORK_STATUS_CALIBRATION:
                 if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
-                    calibrate_tick = 0;
+                    if (count_key_repeat() == 0) {
+                        calibrate_tick = 0;
+                    }
                 }
                 break;
             case WORK_STATUS_SHUTDOWN:
@@ -423,11 +432,13 @@ void app_main()
                 int32_t cal2 = spi_adc_get_value();
                 ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
                 set_calibration(calibrate_index++, cal1, cal2);
+                display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_NUMS-calibrate_index);
                 beap(0, 200);
                 calibrate_tick = -1;
                 //exit calibration mode
                 if (calibrate_index >= CALIBRATION_NUMS) {
                     ESP_LOGD(TAG,"exist calibration mode\n");
+                    display_restore();
                     work_status = WORK_STATUS_NORMAL;
                     calibrate_index = 0;
                     beap(100,400);
@@ -444,7 +455,6 @@ void app_main()
     bs_timer_deinit();
     bt_stop();
     //check ota
-    ESP_LOGD(TAG,"wifi status: %d\n", ws_get_status());
     if (ws_get_status() == WIFI_STATUS_CONNECTED) {
         firmware_t* firmware = config_get_firmware_upgrade();
         if (firmware->host != NULL) {
