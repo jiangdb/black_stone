@@ -444,7 +444,8 @@ void app_main()
     bs_timer_deinit();
     bt_stop();
     //check ota
-    if (ws_get_status() != WIFI_STATUS_CONNECTED) {
+    ESP_LOGD(TAG,"wifi status: %d\n", ws_get_status());
+    if (ws_get_status() == WIFI_STATUS_CONNECTED) {
         firmware_t* firmware = config_get_firmware_upgrade();
         if (firmware->host != NULL) {
             if (!ota_task(firmware)){
