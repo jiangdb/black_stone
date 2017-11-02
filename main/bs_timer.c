@@ -171,6 +171,11 @@ void bs_timer_pause(bs_timer_e timer)
     sTimers[timer].timer_enabled = false;
 }
 
+bool bs_timer_status(bs_timer_e timer)
+{
+    return sTimers[timer].timer_enabled;
+}
+
 bool bs_timer_toggle(bs_timer_e timer)
 {
     if (!sTimers[timer].timer_enabled){

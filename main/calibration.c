@@ -17,17 +17,6 @@
 #define CONFIG_CHANNEL_0_CALIBRATION   "channel_0_cal"
 #define CONFIG_CHANNEL_1_CALIBRATION   "channel_1_cal"
 
-int32_t calibrations[2][2] = {
-    {
-        0,
-        0,
-    },
-    {
-        0,
-        0,
-    }
-};
-
 char* config_zero_name[2] = {
     CONFIG_CHANNEL_0_ZERO,
     CONFIG_CHANNEL_1_ZERO
@@ -90,32 +79,20 @@ int32_t convert_weight(int8_t channel, int32_t adcValue, bool abs)
     }
 }
 
-void set_calibration(int index, int32_t channel0, int32_t channel1)
+void set_calibration(int32_t channel0[3], int32_t channel1[3])
 {
-    if (index<0 || index>CALIBRATION_NUMS) return;
+    ESP_LOGD(TAG,"set abs zero: %d, %d\n",  channel0[0], channel1[0]);
+    ESP_LOGD(TAG,"calibrations: %d, %d --  %d, %d\n", channel0[1], channel0[2],channel1[1],channel1[2]);
+    absZero[0] = channel0[0];
+    absZero[1] = channel1[0];
+    config_write(CONFIG_CHANNEL_0_ABS_ZERO, channel0[0]);
+    config_write(CONFIG_CHANNEL_1_ABS_ZERO, channel1[0]);
 
-    if (index == 0) {
-        ESP_LOGD(TAG,"set abs zero: %d, %d\n",  channel0, channel1);
-        absZero[0] = channel0;
-        absZero[1] = channel1;
-        config_write(CONFIG_CHANNEL_0_ABS_ZERO, channel0);
-        config_write(CONFIG_CHANNEL_1_ABS_ZERO, channel1);
-        return;
-    }
-
-    index--;
-    calibrations[0][index] = channel0;
-    calibrations[1][index] = channel1;
-
-    ESP_LOGD(TAG,"set cal[%d]: %d, %d\n", index, channel0, channel1);
-    if (index == 1) {
-        cal[0] = calibrations[0][1]-calibrations[0][0];
-        cal[1] = calibrations[1][1]-calibrations[1][0];
-        config_write(CONFIG_CHANNEL_0_CALIBRATION, cal[0]);
-        config_write(CONFIG_CHANNEL_1_CALIBRATION, cal[1]);
-        ESP_LOGD(TAG,"calibrations: %d, %d --  %d, %d\n", calibrations[0][0], calibrations[0][1],calibrations[1][0],calibrations[1][1]);
-        ESP_LOGD(TAG,"write cal config: %d, %d\n", cal[0], cal[1]);
-    }
+    cal[0] = channel0[2]-channel0[1];
+    cal[1] = channel1[2]-channel1[1];
+    config_write(CONFIG_CHANNEL_0_CALIBRATION, cal[0]);
+    config_write(CONFIG_CHANNEL_1_CALIBRATION, cal[1]);
+    ESP_LOGD(TAG,"write cal config: %d, %d\n", cal[0], cal[1]);
 }
 
 void calibration_init()

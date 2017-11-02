@@ -268,6 +268,11 @@ static void handle_key_event(void *arg)
                     }else{
                         calibrate_tick = 0;
                     }
+                }else if (keyEvent.key_type == TIMER_KEY && keyEvent.key_value == KEY_DOWN) {
+                    //exit calibration mode
+                    ESP_LOGD(TAG,"exist calibration mode\n");
+                    display_restore();
+                    work_status = WORK_STATUS_NORMAL;
                 }
                 break;
             case WORK_STATUS_SHUTDOWN:
@@ -428,6 +433,7 @@ void app_main()
     ESP_LOGD(TAG,"enter main loop!!!\n");
     work_status = WORK_STATUS_NORMAL;
 
+    int32_t calibration_data[2][3] = {0};
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
@@ -473,13 +479,15 @@ void app_main()
                 beap(100, 400);
                 calibrate_tick = -1;
                 calibrate_step++;
+                memset(calibration_data,0,sizeof(calibration_data));
             }
-            if (calibrate_tick >= 20) {
+            if (calibrate_step < CALIBRATION_STEP_NUM && calibrate_tick >= 20) {
                 //set calibration
                 int32_t cal1 = gpio_adc_get_value();
                 int32_t cal2 = spi_adc_get_value();
                 ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
-                set_calibration(calibrate_step-CALIBRATION_STEP_ZERO, cal1, cal2);
+                calibration_data[0][calibrate_step-CALIBRATION_STEP_ZERO] = cal1;
+                calibration_data[1][calibrate_step-CALIBRATION_STEP_ZERO] = cal2;
                 display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_STEP_NUM-calibrate_step-1);
                 beap(0, 200);
                 calibrate_step++;
@@ -488,6 +496,7 @@ void app_main()
             if (calibrate_step >= CALIBRATION_STEP_NUM) {
                 //exit calibration mode
                 ESP_LOGD(TAG,"exist calibration mode\n");
+                set_calibration(calibration_data[0], calibration_data[1]);
                 display_restore();
                 work_status = WORK_STATUS_NORMAL;
                 beap(100,400);

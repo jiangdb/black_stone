@@ -27,6 +27,7 @@
 #include "bta_api.h"
 #include "gatts_service.h"
 #include "wifi_service.h"
+#include "bs_timer.h"
 #include "config.h"
 #include "battery.h"
 #include "key_event.h"
@@ -48,12 +49,12 @@
 #define CHAR_UUID_WEIGHT_MEAS           0x2A9D
 #define CHAR_UUID_WEIGHT_SCALE_FEATURE  0x2A9E
 
-#define WEIGHT_CONTROL_OPT_READ         0
-#define WEIGHT_CONTROL_OPT_WRITE        1
-#define WEIGHT_CONTROL_OPT_NOTIFY       2
-#define WEIGHT_CONTROL_STATUS_SUCCESS   0
-#define WEIGHT_CONTROL_STATUS_FAIL      1
-#define WEIGHT_CONTROL_MAX_LEN          128
+#define CONTROL_OPT_READ         0
+#define CONTROL_OPT_WRITE        1
+#define CONTROL_OPT_NOTIFY       2
+#define CONTROL_STATUS_SUCCESS   0
+#define CONTROL_STATUS_FAIL      1
+#define CONTROL_MAX_LEN          128
 
 #define CHAR_DECLARATION_SIZE           (sizeof(uint8_t))
 
@@ -61,19 +62,22 @@
  * ENUMS
  */
 enum {
-    WEIGHT_CONTROL_NOTIFY_WIFI,
-    WEIGHT_CONTROL_NOTIFY_BATTERY,
+    CONTROL_NOTIFY_WIFI,
+    CONTROL_NOTIFY_BATTERY,
 };
 
 enum {
-    WEIGHT_CONTROL_SET_ZERO,
-    WEIGHT_CONTROL_ZERO_TRACK,
-    WEIGHT_CONTROL_ALARM,
-    WEIGHT_CONTROL_WEIGHT_UNIT,
-    WEIGHT_CONTROL_ALARM_TIME,
-    WEIGHT_CONTROL_ALARM_WEIGHT,
-    WEIGHT_CONTROL_WIFI,
-    WEIGHT_CONTROL_FW_UPGRADE,
+    CONTROL_SET_ZERO,
+    CONTROL_ZERO_TRACK,
+    CONTROL_ALARM,
+    CONTROL_WEIGHT_UNIT,
+    CONTROL_ALARM_TIME,
+    CONTROL_ALARM_WEIGHT,
+    CONTROL_WIFI,
+    CONTROL_FW_UPGRADE,
+    CONTROL_START_TIMER,
+    CONTROL_PAUSE_TIMER,
+    CONTROL_RESET_TIMER,
 };
 
 enum
@@ -413,7 +417,7 @@ static const esp_gatts_attr_db_t device_information_gatt_db[DIS_IDX_NB] = {
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
-    ESP_LOGD(GATTS_SERVICE_TAG, "GAP_EVT, event %d\n", event);
+    ESP_LOGD(GATTS_SERVICE_TAG, "GAP_EVT, event %d", event);
 
     switch (event) {
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
@@ -433,8 +437,8 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 static void init_weight_control_value(uint8_t* value, uint16_t* len)
 {
     int index=0;
-    value[index++] = WEIGHT_CONTROL_OPT_READ;           //operation type
-    value[index++] = WEIGHT_CONTROL_STATUS_SUCCESS;     //operation status
+    value[index++] = CONTROL_OPT_READ;           //operation type
+    value[index++] = CONTROL_STATUS_SUCCESS;     //operation status
     value[index++] = config_get_zero_track();
     value[index++] = config_get_alarm_enable();
     value[index++] = config_get_weight_unit();
@@ -462,13 +466,13 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
     //prepare response
     uint8_t reply[2];
     memset(reply, 0, sizeof(reply));
-    reply[0] = WEIGHT_CONTROL_OPT_WRITE;
-    reply[1] = WEIGHT_CONTROL_STATUS_SUCCESS;
+    reply[0] = CONTROL_OPT_WRITE;
+    reply[1] = CONTROL_STATUS_SUCCESS;
 
     uint8_t *pData = (uint8_t *)param->write.value;
     ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control %d", pData[0]);
     switch(pData[0]) {
-        case WEIGHT_CONTROL_SET_ZERO:
+        case CONTROL_SET_ZERO:
             {
                 key_event_t keyEvent;
                 keyEvent.key_type = CLEAR_KEY;
@@ -476,28 +480,28 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 send_key_event(keyEvent,false);
             }
             break;
-        case WEIGHT_CONTROL_ZERO_TRACK:
+        case CONTROL_ZERO_TRACK:
             config_set_zero_track(pData[1]);
             break;
-        case WEIGHT_CONTROL_ALARM:
+        case CONTROL_ALARM:
             config_set_alarm_enable(pData[1]);
             break;
-        case WEIGHT_CONTROL_WEIGHT_UNIT:
+        case CONTROL_WEIGHT_UNIT:
             config_set_weight_unit(pData[1]);
             break;
-        case WEIGHT_CONTROL_ALARM_TIME:
+        case CONTROL_ALARM_TIME:
             {
                 uint16_t time = pData[1]<<8|pData[2];
                 config_set_alarm_time(time);
             }
             break;
-        case WEIGHT_CONTROL_ALARM_WEIGHT:
+        case CONTROL_ALARM_WEIGHT:
             {
                 uint16_t weight = pData[1]<<8|pData[2];
                 config_set_alarm_weight(weight);
             }
             break;
-        case WEIGHT_CONTROL_WIFI:
+        case CONTROL_WIFI:
             {
                 uint8_t name_len = pData[1];
                 config_set_wifi_name((char*)&pData[2],name_len);
@@ -506,7 +510,7 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
             }
             break;
-        case WEIGHT_CONTROL_FW_UPGRADE:
+        case CONTROL_FW_UPGRADE:
             {
                 uint8_t host_len = pData[1];
                 config_set_wifi_name((char*)&pData[2],host_len);
@@ -521,9 +525,33 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 send_key_event(keyEvent,false);
             }
             break;
+        case CONTROL_START_TIMER:
+            if (!bs_timer_status(TIMER_STOPWATCH)) {
+                key_event_t keyEvent;
+                keyEvent.key_type = TIMER_KEY;
+                keyEvent.key_value = KEY_DOWN;
+                send_key_event(keyEvent,false);
+            }
+            break;
+        case CONTROL_PAUSE_TIMER:
+            if (bs_timer_status(TIMER_STOPWATCH)) {
+                key_event_t keyEvent;
+                keyEvent.key_type = TIMER_KEY;
+                keyEvent.key_value = KEY_DOWN;
+                send_key_event(keyEvent,false);
+            }
+            break;
+        case CONTROL_RESET_TIMER:
+            {
+                key_event_t keyEvent;
+                keyEvent.key_type = TIMER_KEY;
+                keyEvent.key_value = KEY_HOLD;
+                send_key_event(keyEvent,false);
+            }
+            break;
         default:
             ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])
-            reply[1] = WEIGHT_CONTROL_STATUS_FAIL;
+            reply[1] = CONTROL_STATUS_FAIL;
             break;
     }
 
@@ -534,7 +562,7 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, 
                                            esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) 
 {
-    //ESP_LOGE(GATTS_SERVICE_TAG, "event = %x\n",event);
+    //ESP_LOGE(GATTS_SERVICE_TAG, "PROFILE event = %x\n",event);
     switch (event) {
         case ESP_GATTS_REG_EVT:
             esp_ble_gap_set_device_name(DEVICE_NAME);
@@ -545,7 +573,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
                                     DIS_IDX_NB, DEVICE_INFORMATION_SVC_INST_ID);
             break;
         case ESP_GATTS_READ_EVT:
-            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
+            ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
             if (param->read.handle == weight_scale_handle_table[WSS_IDX_WS_CTNL_PT_VAL]) {
                 ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, read control\n");
                 esp_gatt_rsp_t rsp;
@@ -592,7 +620,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
             conn_params.max_int = 0x50;    // max_int = 0x50*1.25ms = 100ms
             conn_params.min_int = 0x30;    // min_int = 0x30*1.25ms = 60ms
             conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
-            ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d\n",
+            ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",
                      param->connect.conn_id,
                      param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
                      param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5],
@@ -620,7 +648,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
         case ESP_GATTS_CONGEST_EVT:
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:
-            ESP_LOGD(GATTS_SERVICE_TAG, "[%x]: The number handle =%x\n",param->add_attr_tab.svc_uuid.uuid.uuid16, param->add_attr_tab.num_handle);
+            ESP_LOGD(GATTS_SERVICE_TAG, "[%x]: The number handle =%x",param->add_attr_tab.svc_uuid.uuid.uuid16, param->add_attr_tab.num_handle);
             if (param->add_attr_tab.status != ESP_GATT_OK){
                 ESP_LOGE(GATTS_SERVICE_TAG, "Create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
@@ -644,7 +672,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, 
                                     esp_ble_gatts_cb_param_t *param)
 {
-    ESP_LOGD(GATTS_SERVICE_TAG, "EVT %d, gatts if %d\n", event, gatts_if);
+    ESP_LOGD(GATTS_SERVICE_TAG, "GATTS_EVT %d, gatts if %d", event, gatts_if);
 
     /* If event is register event, store the gatts_if for each profile */
     if (event == ESP_GATTS_REG_EVT) {
@@ -680,7 +708,7 @@ static void notify_control_point(uint8_t key, uint8_t value)
     uint8_t notify[4];
     memset(notify, 0, sizeof(notify));
 
-    notify[0] = WEIGHT_CONTROL_OPT_NOTIFY;
+    notify[0] = CONTROL_OPT_NOTIFY;
     notify[1] = key;
     notify[2] = value;
 
@@ -693,12 +721,12 @@ static void notify_control_point(uint8_t key, uint8_t value)
 
 void bt_notify_wifi_status(uint8_t wifi_status)
 {
-    notify_control_point(WEIGHT_CONTROL_NOTIFY_WIFI, wifi_status);
+    notify_control_point(CONTROL_NOTIFY_WIFI, wifi_status);
 }
 
 void bt_notify_battery_level(uint8_t level)
 {
-    notify_control_point(WEIGHT_CONTROL_NOTIFY_BATTERY, level);
+    notify_control_point(CONTROL_NOTIFY_BATTERY, level);
 }
 
 static void ble_notify_measurement()
