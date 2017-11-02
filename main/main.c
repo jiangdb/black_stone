@@ -48,8 +48,16 @@ enum {
     SCALE_NUM
 };
 
+enum {
+    CALIBRATION_STEP_INIT,
+    CALIBRATION_STEP_ZERO,
+    CALIBRATION_STEP_ONE,
+    CALIBRATION_STEP_TWO,
+    CALIBRATION_STEP_NUM,
+};
+
 static int calibrate_tick = -1;
-static int calibrate_index = 0;
+static int calibrate_step = 0;
 static bool display_lock[2] = {false, false};
 static int display_lock_count[2] = {0,0};
 static int set_zero_count = -1;
@@ -134,6 +142,7 @@ static int count_key_repeat ()
     }
     lastDataReadyTime=currtime;
 
+    ESP_LOGD(TAG,"repeat count %d\n", key_repeat_count);
     return key_repeat_count;
 }
 
@@ -182,8 +191,7 @@ static void handle_key_event(void *arg)
                     case CLEAR_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
                             if (work_status == WORK_STATUS_NORMAL) {
-                                int count = count_key_repeat();
-                                if (count > 0 ) {
+                                if (count_key_repeat() > 0 ) {
                                     //we got repeat key
                                     set_zero_count = 0; 
                                 }
@@ -193,17 +201,14 @@ static void handle_key_event(void *arg)
                                 trigger_sleep_count = 0;
                                 // enter_sleep();
                                 done = true;
-                            } else if (key_repeat_count >= REPEAT_COUNT_CALIBRATION) {
+                            } else if (key_repeat_count == REPEAT_COUNT_CALIBRATION) {
                                 if (work_status == WORK_STATUS_NORMAL) {
                                     set_zero_count = -1; 
                                     //do calibration
                                     ESP_LOGD(TAG,"enter calibration mode\n");
-                                    beap(100, 200);
-                                    beap(100, 400);
                                     work_status = WORK_STATUS_CALIBRATION;
-                                    display_backup();
-                                    display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, 3);
-                                    count_key_repeat();
+                                    calibrate_tick = 0;
+                                    calibrate_step = CALIBRATION_STEP_INIT;
                                 }
                             } else if (key_repeat_count == 0) {
                                 //start count for set zero
@@ -229,7 +234,11 @@ static void handle_key_event(void *arg)
                 break;
             case WORK_STATUS_CALIBRATION:
                 if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
-                    if (count_key_repeat() == 0) {
+                    if (count_key_repeat() > REPEAT_COUNT_CALIBRATION && calibrate_step == CALIBRATION_STEP_INIT) {
+                        //exit calibration mode
+                        ESP_LOGD(TAG,"exist calibration mode\n");
+                        work_status = WORK_STATUS_NORMAL;
+                    }else{
                         calibrate_tick = 0;
                     }
                 }
@@ -427,22 +436,33 @@ void app_main()
             } 
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
+            if (calibrate_step == CALIBRATION_STEP_INIT && calibrate_tick >= 5) {
+                ESP_LOGD(TAG,"calibration_init done\n");
+                //calibration init
+                display_backup();
+                display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, 3);
+                beap(100, 200);
+                beap(100, 400);
+                calibrate_tick = -1;
+                calibrate_step++;
+            }
             if (calibrate_tick >= 20) {
+                //set calibration
                 int32_t cal1 = gpio_adc_get_value();
                 int32_t cal2 = spi_adc_get_value();
                 ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
-                set_calibration(calibrate_index++, cal1, cal2);
-                display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_NUMS-calibrate_index);
+                set_calibration(calibrate_step-CALIBRATION_STEP_ZERO, cal1, cal2);
+                display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_STEP_NUM-calibrate_step-1);
                 beap(0, 200);
+                calibrate_step++;
                 calibrate_tick = -1;
+            }
+            if (calibrate_step >= CALIBRATION_STEP_NUM) {
                 //exit calibration mode
-                if (calibrate_index >= CALIBRATION_NUMS) {
-                    ESP_LOGD(TAG,"exist calibration mode\n");
-                    display_restore();
-                    work_status = WORK_STATUS_NORMAL;
-                    calibrate_index = 0;
-                    beap(100,400);
-                }
+                ESP_LOGD(TAG,"exist calibration mode\n");
+                display_restore();
+                work_status = WORK_STATUS_NORMAL;
+                beap(100,400);
             }
         }
     }
