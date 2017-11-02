@@ -508,6 +508,9 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 uint16_t pass_offset = 2+name_len;
                 uint8_t pass_len = pData[pass_offset];
                 config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
+                char* wifi_name = config_get_wifi_name();
+                char* wifi_pass = config_get_wifi_pass();
+                ws_connect(wifi_name, wifi_pass);
             }
             break;
         case CONTROL_FW_UPGRADE:
