@@ -176,41 +176,68 @@ static void handle_key_event(void *arg)
                 }
                 break;
             case WORK_STATUS_NORMAL:
-            case WORK_STATUS_WORKING:
                 switch(keyEvent.key_type){
                     case TIMER_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
-                            bool started = bs_timer_toggle(TIMER_STOPWATCH);
-                            if (started) work_status = WORK_STATUS_WORKING;
-                            else work_status = WORK_STATUS_NORMAL;
-                        }else if (keyEvent.key_value == KEY_HOLD) {
-                            bs_timer_stop(TIMER_STOPWATCH);
-                            work_status = WORK_STATUS_NORMAL;
+                            if (bs_timer_toggle(TIMER_STOPWATCH)) {
+                                work_status = WORK_STATUS_WORKING;
+                            }
                         }
                         break;
                     case CLEAR_KEY:
                         if (keyEvent.key_value == KEY_DOWN) {
-                            if (work_status == WORK_STATUS_NORMAL) {
-                                if (count_key_repeat() > 0 ) {
-                                    //we got repeat key
-                                    set_zero_count = 0; 
-                                }
-                            }
+                            count_key_repeat();
                         }else if (keyEvent.key_value == KEY_UP) {
                             if (trigger_sleep_count >= 1) {
                                 trigger_sleep_count = 0;
                                 // enter_sleep();
                                 done = true;
                             } else if (key_repeat_count == REPEAT_COUNT_CALIBRATION) {
-                                if (work_status == WORK_STATUS_NORMAL) {
-                                    set_zero_count = -1; 
-                                    //do calibration
-                                    ESP_LOGD(TAG,"enter calibration mode\n");
-                                    work_status = WORK_STATUS_CALIBRATION;
-                                    calibrate_tick = 0;
-                                    calibrate_step = CALIBRATION_STEP_INIT;
-                                }
-                            } else if (key_repeat_count == 0) {
+                                //do calibration
+                                set_zero_count = -1; 
+                                ESP_LOGD(TAG,"enter calibration mode\n");
+                                work_status = WORK_STATUS_CALIBRATION;
+                                calibrate_tick = 0;
+                                calibrate_step = CALIBRATION_STEP_INIT;
+                            } else {
+                                //start count for set zero
+                                set_zero_count = 0; 
+                            }
+                        } else if (keyEvent.key_value == KEY_HOLD) {
+                            trigger_sleep_count++;
+                        }
+                        break;
+                    case SLEEP_KEY:
+                    case FIRMWARE_UPGRADE_KEY:
+                        done = true;
+                        break;
+                    case CHARGE_KEY:
+                        display_indicate_charging();
+                        break;
+                    case NOT_CHARGE_KEY:
+                        display_disable_charging();
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            case WORK_STATUS_WORKING:
+                switch(keyEvent.key_type){
+                    case TIMER_KEY:
+                        if (keyEvent.key_value == KEY_DOWN) {
+                            bs_timer_toggle(TIMER_STOPWATCH);
+                        }else if (keyEvent.key_value == KEY_HOLD) {
+                            bs_timer_stop(TIMER_STOPWATCH);
+                            work_status = WORK_STATUS_NORMAL;
+                        }
+                        break;
+                    case CLEAR_KEY:
+                        if (keyEvent.key_value == KEY_UP) {
+                            if (trigger_sleep_count >= 1) {
+                                trigger_sleep_count = 0;
+                                // enter_sleep();
+                                done = true;
+                            } else {
                                 //start count for set zero
                                 set_zero_count = 0; 
                             }
@@ -419,6 +446,7 @@ void app_main()
             }
             int32_t downAdcValue = spi_adc_get_value();
             processAdcValue(DOWN_SCALE, downAdcValue, upWight);
+
             //need hanlde zero
             if (set_zero_count >= 0 ) {
                 set_zero_count++;
