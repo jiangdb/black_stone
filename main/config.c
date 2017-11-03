@@ -58,6 +58,7 @@ bool config_write(char* name, int32_t value)
 {
     esp_err_t err;
     err = nvs_set_i32(config_handle, name, value);
+    printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
 
     // Commit written value.
     // After setting any values, nvs_commit() must be called to ensure changes are written

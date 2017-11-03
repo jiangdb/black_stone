@@ -69,6 +69,7 @@ static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
 static bool alarmed = false;
+static bool doubleScale = false;
 static xQueueHandle eventQueue;
 static TaskHandle_t xHandle = NULL;
 
@@ -433,12 +434,10 @@ void app_main()
     work_status = WORK_STATUS_NORMAL;
 
     int32_t calibration_data[2][3] = {0};
-    bool doubleScale = false;
-    
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
-            int32_t upAdcValue = spi_adc_get_value();
+            int32_t upAdcValue = gpio_adc_get_value();
             if (!doubleScale) {
                 int32_t absWeight = convert_weight(0, upAdcValue, true);
                 uint8_t weightUnit = config_get_weight_unit();
@@ -451,7 +450,7 @@ void app_main()
             if (doubleScale) {
                 upWight = processAdcValue(UP_SCALE, upAdcValue, 0);
             }
-            int32_t downAdcValue = gpio_adc_get_value();
+            int32_t downAdcValue = spi_adc_get_value();
             processAdcValue(DOWN_SCALE, downAdcValue, upWight);
 
             //need hanlde zero
@@ -459,11 +458,11 @@ void app_main()
                 set_zero_count++;
                 if (set_zero_count > 10) {
                     if (doubleScale) {
-                        cal_set_zero(UP_SCALE, upAdcValue);
+                        cal_set_zero(0, upAdcValue);
                         setDisplayNumber(0, 0);
                         bt_set_weight(0, 0);
                     }
-                    cal_set_zero(DOWN_SCALE, downAdcValue);
+                    cal_set_zero(1, downAdcValue);
                     setDisplayNumber(1, 0);
                     bt_set_weight(1, 0);
                     set_zero_count = -1;
@@ -484,11 +483,11 @@ void app_main()
             }
             if (calibrate_step < CALIBRATION_STEP_NUM && calibrate_tick >= 20) {
                 //set calibration
-                int32_t cal1 = spi_adc_get_value();
-                int32_t cal2 = gpio_adc_get_value();
+                int32_t cal1 = gpio_adc_get_value();
+                int32_t cal2 = spi_adc_get_value();
                 ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
-                calibration_data[UP_SCALE][calibrate_step-CALIBRATION_STEP_ZERO] = cal1;
-                calibration_data[DOWN_SCALE][calibrate_step-CALIBRATION_STEP_ZERO] = cal2;
+                calibration_data[0][calibrate_step-CALIBRATION_STEP_ZERO] = cal1;
+                calibration_data[1][calibrate_step-CALIBRATION_STEP_ZERO] = cal2;
                 display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_STEP_NUM-calibrate_step-1);
                 beap(0, 200);
                 calibrate_step++;
@@ -497,7 +496,7 @@ void app_main()
             if (calibrate_step >= CALIBRATION_STEP_NUM) {
                 //exit calibration mode
                 ESP_LOGD(TAG,"exist calibration mode\n");
-                set_calibration(calibration_data[UP_SCALE], calibration_data[DOWN_SCALE]);
+                set_calibration(calibration_data[0], calibration_data[1]);
                 display_restore();
                 work_status = WORK_STATUS_NORMAL;
                 beap(100,400);
