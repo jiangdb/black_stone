@@ -201,7 +201,7 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_GpioAdcData, value);
     value = queue_get_value(&qb_GpioAdcData, ALG_MEDIAN_VALUE);
 #endif
-    if (abs(gpio_adc_value - value) >=3 ) {
+    if (abs(gpio_adc_value - value) >=2 ) {
         gpio_adc_value = value;
         //printf("gpio_adc_value: %d\n", gpio_adc_value);
     }
