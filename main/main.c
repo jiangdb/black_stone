@@ -64,7 +64,7 @@ static int set_zero_count = -1;
 static int32_t last_weight[2] = {0,0};
 static bool done = false;
 static int trigger_sleep_count = 0;
-static int key_repeat_count = 0;
+static int cal_key_repeat_count = -1;
 static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
@@ -127,25 +127,6 @@ static bool is_wakeup_by_key()
     return false;
 }
 
-static int count_key_repeat ()
-{
-    static uint32_t lastDataReadyTime = 0;
-
-    uint32_t currtime=xthal_get_ccount();
-    uint32_t diff=currtime-lastDataReadyTime;
-
-    //consider 500ms (240000*500) as 
-    if ( diff < 120000000 ) {
-        key_repeat_count++;
-    } else {
-        key_repeat_count = 0;
-    }
-    lastDataReadyTime=currtime;
-
-    ESP_LOGD(TAG,"repeat count %d\n", key_repeat_count);
-    return key_repeat_count;
-}
-
 void send_key_event(key_event_t keyEvent, bool fromIsr)
 {
     if (fromIsr) {
@@ -157,6 +138,7 @@ void send_key_event(key_event_t keyEvent, bool fromIsr)
 
 static void handle_key_event(void *arg)
 {
+    bool timer_hold = false;
     while(1) {
         key_event_t keyEvent;
         xQueueReceive(eventQueue, &keyEvent, portMAX_DELAY);
@@ -178,27 +160,33 @@ static void handle_key_event(void *arg)
             case WORK_STATUS_NORMAL:
                 switch(keyEvent.key_type){
                     case TIMER_KEY:
-                        if (keyEvent.key_value == KEY_DOWN) {
-                            if (bs_timer_toggle(TIMER_STOPWATCH)) {
+                        if (keyEvent.key_value == KEY_HOLD) {
+                            if (cal_key_repeat_count < 0) {
+                                cal_key_repeat_count = 0;
+                            }
+                        }else if (keyEvent.key_value == KEY_UP) {
+                            if (cal_key_repeat_count >= 0) {
+                                cal_key_repeat_count = -1;
+                            }else if (bs_timer_toggle(TIMER_STOPWATCH)) {
                                 work_status = WORK_STATUS_WORKING;
                             }
                         }
                         break;
                     case CLEAR_KEY:
-                        if (keyEvent.key_value == KEY_DOWN) {
-                            count_key_repeat();
-                        }else if (keyEvent.key_value == KEY_UP) {
-                            if (trigger_sleep_count >= 1) {
+                        if (keyEvent.key_value == KEY_UP) {
+                            if (cal_key_repeat_count >= 0) {
+                                cal_key_repeat_count++;
+                                if (cal_key_repeat_count == REPEAT_COUNT_CALIBRATION) {
+                                    //do calibration
+                                    set_zero_count = -1; 
+                                    ESP_LOGD(TAG,"enter calibration mode\n");
+                                    work_status = WORK_STATUS_CALIBRATION;
+                                    calibrate_tick = 0;
+                                    calibrate_step = CALIBRATION_STEP_INIT;
+                                }
+                            }else if (trigger_sleep_count >= 1) {
                                 trigger_sleep_count = 0;
-                                // enter_sleep();
                                 done = true;
-                            } else if (key_repeat_count == REPEAT_COUNT_CALIBRATION) {
-                                //do calibration
-                                set_zero_count = -1; 
-                                ESP_LOGD(TAG,"enter calibration mode\n");
-                                work_status = WORK_STATUS_CALIBRATION;
-                                calibrate_tick = 0;
-                                calibrate_step = CALIBRATION_STEP_INIT;
                             } else {
                                 //start count for set zero
                                 set_zero_count = 0; 
@@ -224,11 +212,16 @@ static void handle_key_event(void *arg)
             case WORK_STATUS_WORKING:
                 switch(keyEvent.key_type){
                     case TIMER_KEY:
-                        if (keyEvent.key_value == KEY_DOWN) {
-                            bs_timer_toggle(TIMER_STOPWATCH);
+                        if (keyEvent.key_value == KEY_UP) {
+                            if (!timer_hold) {
+                                bs_timer_toggle(TIMER_STOPWATCH);
+                            }else{
+                                work_status = WORK_STATUS_NORMAL;
+                            }
+                            timer_hold = false;
                         }else if (keyEvent.key_value == KEY_HOLD) {
                             bs_timer_stop(TIMER_STOPWATCH);
-                            work_status = WORK_STATUS_NORMAL;
+                            timer_hold = true;
                         }
                         break;
                     case CLEAR_KEY:
@@ -261,18 +254,18 @@ static void handle_key_event(void *arg)
                 break;
             case WORK_STATUS_CALIBRATION:
                 if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_DOWN) {
-                    if (count_key_repeat() > REPEAT_COUNT_CALIBRATION && calibrate_step == CALIBRATION_STEP_INIT) {
-                        //exit calibration mode
-                        ESP_LOGD(TAG,"exist calibration mode\n");
-                        work_status = WORK_STATUS_NORMAL;
-                    }else{
+                    if (cal_key_repeat_count < 0) {
                         calibrate_tick = 0;
                     }
-                }else if (keyEvent.key_type == TIMER_KEY && keyEvent.key_value == KEY_DOWN) {
-                    //exit calibration mode
-                    ESP_LOGD(TAG,"exist calibration mode\n");
-                    display_restore();
-                    work_status = WORK_STATUS_NORMAL;
+                }else if (keyEvent.key_type == TIMER_KEY && keyEvent.key_value == KEY_UP) {
+                    if (cal_key_repeat_count > 0) {
+                        cal_key_repeat_count = -1;
+                    } else {
+                        //exit calibration mode
+                        ESP_LOGD(TAG,"exit calibration mode\n");
+                        display_restore();
+                        work_status = WORK_STATUS_NORMAL;
+                    }
                 }
                 break;
             case WORK_STATUS_SHUTDOWN:
@@ -470,7 +463,7 @@ void app_main()
             } 
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
-            if (calibrate_step == CALIBRATION_STEP_INIT && calibrate_tick >= 5) {
+            if (calibrate_step == CALIBRATION_STEP_INIT && calibrate_tick >= 2) {
                 ESP_LOGD(TAG,"calibration_init done\n");
                 //calibration init
                 display_backup();
@@ -495,7 +488,7 @@ void app_main()
             }
             if (calibrate_step >= CALIBRATION_STEP_NUM) {
                 //exit calibration mode
-                ESP_LOGD(TAG,"exist calibration mode\n");
+                ESP_LOGD(TAG,"exit calibration mode\n");
                 set_calibration(calibration_data[0], calibration_data[1]);
                 display_restore();
                 work_status = WORK_STATUS_NORMAL;
