@@ -20,31 +20,31 @@
 #include "calibration.h"
 #include "config.h"
 
-#define TRACKER_TIME_THRESHOLD      1000    //1s
-#define TRACKER_VALUE_THRESHOLD     5       //500mg
+#define TRACE_TIME_THRESHOLD      1000    //1s
+#define TRACE_VALUE_THRESHOLD     5       //500mg
 
 static int total_time[2] = {0,0};
 
 /*
- * zero track
+ * zero trace
  *
  * @param ch channel
  * @weight weight in 100mg
  * @adcValue adc value
- * @interval intreval between two tracks, in ms 
+ * @interval intreval between two trace, in ms 
  * @return bool indicate set zero or not
  */
-bool zero_track(int ch, int32_t adcValue, int32_t weight, int interval)
+bool zero_trace(int ch, int32_t adcValue, int32_t weight, int interval)
 {
-    int enable = config_get_zero_track();
+    int enable = config_get_zero_trace();
     if (enable) {
         int zero = get_zero(ch);
         
-        if ((adcValue == zero) || (abs(weight) > TRACKER_VALUE_THRESHOLD) ) {
+        if ((adcValue == zero) || (abs(weight) > TRACE_VALUE_THRESHOLD) ) {
             total_time[ch] = 0;
         } else {
             total_time[ch] += interval;
-            if (total_time[ch] >= TRACKER_TIME_THRESHOLD) {
+            if (total_time[ch] >= TRACE_TIME_THRESHOLD) {
                 cal_set_zero(ch, adcValue);
                 return true;
             }

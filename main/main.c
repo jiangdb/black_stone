@@ -43,8 +43,8 @@ enum {
 };
 
 enum {
-    UP_SCALE,
-    DOWN_SCALE,
+    SCALE_UP,
+    SCALE_DOWN,
     SCALE_NUM
 };
 
@@ -61,7 +61,7 @@ static int calibrate_step = 0;
 static bool display_lock[2] = {false, false};
 static int display_lock_count[2] = {0,0};
 static int set_zero_count = -1;
-static int32_t last_weight[2] = {0,0};
+static int32_t lock_weight[2] = {0,0};
 static bool done = false;
 static int trigger_sleep_count = 0;
 static int key_repeat_count = 0;
@@ -69,7 +69,6 @@ static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
 static bool alarmed = false;
-static bool doubleScale = false;
 static xQueueHandle eventQueue;
 static TaskHandle_t xHandle = NULL;
 
@@ -80,22 +79,6 @@ static void lock_display(int channel, bool lock)
         display_lock_count[channel] = 0;
     }
     ESP_LOGD(TAG,"lock_display[%d]: %d!!!\n", channel, lock);
-}
-
-static void led_on()
-{
-    //GPIO config for the data line.
-    gpio_config_t io_conf={
-        .intr_type=GPIO_PIN_INTR_DISABLE,
-        .mode=GPIO_MODE_OUTPUT,
-        .pull_down_en=0,
-        .pull_up_en=0,
-        .pin_bit_mask=(1<<GPIO_LED_IO)
-    };
-
-    //Set up handshake line interrupt.
-    gpio_config(&io_conf);
-    gpio_set_level(GPIO_LED_IO, 1);
 }
 
 static void enter_sleep()
@@ -284,56 +267,67 @@ static void handle_key_event(void *arg)
     }
 }
 
-int get_work_status()
+static int32_t getAdcValue(uint8_t scaleChannel)
 {
-    return work_status;
+    switch(scaleChannel) {
+        case SCALE_UP:
+            return gpio_adc_get_value();
+            break;
+        case SCALE_DOWN:
+            return spi_adc_get_value();
+            break;
+        default:
+            break;
+    }
+    return 0;
 }
 
-static int32_t processAdcValue(int channel, int32_t value, int32_t weightAddValue)
+static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
 {
-    int32_t weight = convert_weight(channel, value, false);
+    int32_t weight = convert_weight(scaleChannel, adcValue, false);
 
-    // auto track zero
-    bool tracked = zero_track(channel, value, weight, 100);
-    if (tracked) weight = 0;
+    //trace zero
+    bool traced = zero_trace(scaleChannel, adcValue, weight, 100);
+    if (traced) return 0;       //traced zero
 
-    // add any weight if we want, e.g UP_SCALE weight
-    weight += weightAddValue;
-
-    // change more than 1.5g, unlock display
-    if (display_lock[channel] && (abs(last_weight[channel]-weight) > DISPLAY_LOCK_THRESHOLD)) {
-        lock_display(channel, false);
-        last_weight[channel] = weight;
-    }else if (!display_lock[channel]) {
-        // change more than 0.5g, clear count
-        if (abs(last_weight[channel]-weight) > 5){
-            display_lock_count[channel] = 0;
-            last_weight[channel] = weight;
+    //handle lock
+    if (!display_lock[scaleChannel]) {
+        //not locked
+        // change more than 0.5g, clear count, else increase
+        if (abs(lock_weight[scaleChannel]-weight) > 5){
+            display_lock_count[scaleChannel] = 0;
+            lock_weight[scaleChannel] = weight;
         }else{
-            display_lock_count[channel]++;
+            display_lock_count[scaleChannel]++;
             //3s not change, lock display
-            if (display_lock_count[channel] == 30) {
-                lock_display(channel, true);
+            if (display_lock_count[scaleChannel] == 30) {
+                lock_display(scaleChannel, true);
+                lock_weight[scaleChannel] = weight;
             }
         }
-    }
-    if (!display_lock[channel] || tracked) {
-        //check if we need do alarm
-        if ((config_get_alarm_enable()==1) && (channel==DOWN_SCALE) && (work_status == WORK_STATUS_WORKING)) {
-            uint16_t alarmWeight = config_get_alarm_weight(); 
-            if (weight >= alarmWeight) {
-                if (!alarmed ) {
-                    alarmNumber();
-                    alarmed = true;
-                }
-            }else{
-                alarmed = false;
-            }
+        //return unlock value
+        return weight;
+    }else{
+        //locked, check if unlock
+        if ((abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD)) {
+            lock_display(scaleChannel, false);
+            lock_weight[scaleChannel] = weight;
         }
-        setDisplayNumber(channel, weight);
-        bt_set_weight(channel, weight);
+        //return locked value
+        return lock_weight[scaleChannel];
     }
-    return weight;
+}
+
+static bool detectDualScale()
+{
+    int32_t upAdcValue = getAdcValue(SCALE_UP);
+    int32_t absWeight = convert_weight(SCALE_UP, upAdcValue, true);
+    uint8_t weightUnit = config_get_weight_unit();
+    if (((weightUnit == WEIGHT_UNIT_G) && (absWeight > DOUBLE_SCALE_THRESHOLD_G))
+            || ((weightUnit == WEIGHT_UNIT_OZ) && (absWeight > DOUBLE_SCALE_THRESHOLD_OZ))) {
+        return true;
+    }
+    return false;
 }
 
 void app_main()
@@ -398,9 +392,6 @@ void app_main()
         }
     }
 
-    /* led */
-    // led_on();
-
     /* start battery */
     battery_start();
 
@@ -431,43 +422,60 @@ void app_main()
     }
 
     ESP_LOGD(TAG,"enter main loop!!!\n");
-    work_status = WORK_STATUS_NORMAL;
+    int32_t calibration_data[SCALE_NUM][CALIBRATION_NUMS] = {0};
+    bool dualScale = detectDualScale();
 
-    int32_t calibration_data[2][3] = {0};
+    work_status = WORK_STATUS_NORMAL;
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
-            int32_t upAdcValue = gpio_adc_get_value();
-            if (!doubleScale) {
-                int32_t absWeight = convert_weight(0, upAdcValue, true);
-                uint8_t weightUnit = config_get_weight_unit();
-                if (((weightUnit == WEIGHT_UNIT_G) && (absWeight > DOUBLE_SCALE_THRESHOLD_G))
-                        || ((weightUnit == WEIGHT_UNIT_OZ) && (absWeight > DOUBLE_SCALE_THRESHOLD_OZ))) {
-                    doubleScale = true;
-                }
+            int32_t upAdcValue = 0;
+            if (dualScale) {
+                upAdcValue = getAdcValue(SCALE_UP);
             }
-            int32_t upWight = 0;
-            if (doubleScale) {
-                upWight = processAdcValue(UP_SCALE, upAdcValue, 0);
-            }
-            int32_t downAdcValue = spi_adc_get_value();
-            processAdcValue(DOWN_SCALE, downAdcValue, upWight);
-
-            //need hanlde zero
+            int32_t downAdcValue = getAdcValue(SCALE_DOWN);
             if (set_zero_count >= 0 ) {
                 set_zero_count++;
-                if (set_zero_count > 10) {
-                    if (doubleScale) {
-                        cal_set_zero(0, upAdcValue);
-                        setDisplayNumber(0, 0);
-                        bt_set_weight(0, 0);
-                    }
-                    cal_set_zero(1, downAdcValue);
-                    setDisplayNumber(1, 0);
-                    bt_set_weight(1, 0);
-                    set_zero_count = -1;
+            }
+            //hanlde set zero first
+            if (set_zero_count > 10) {
+                if (dualScale) {
+                    cal_set_zero(SCALE_UP, upAdcValue);
+                    setDisplayNumber(DISPLAY_CHANNEL_UP, 0);
+                    bt_set_weight(0, 0);
+                    lock_weight[SCALE_UP] = 0;
                 }
-            } 
+                cal_set_zero(SCALE_DOWN, downAdcValue);
+                setDisplayNumber(DISPLAY_CHANNEL_DOWN, 0);
+                bt_set_weight(1, 0);
+                lock_weight[SCALE_DOWN] = 0;
+                set_zero_count = -1;
+                continue;
+            }
+
+            int32_t upWight = 0;
+            int32_t downWeight = parseAdcValue(SCALE_DOWN, downAdcValue);
+            if (dualScale) {
+                upWight = parseAdcValue(SCALE_UP, upAdcValue);
+                setDisplayNumber(DISPLAY_CHANNEL_UP, downWeight);
+                bt_set_weight(DISPLAY_CHANNEL_UP, downWeight);
+            }
+            //set display
+            int32_t totalWeight = upWight+downWeight;
+            setDisplayNumber(DISPLAY_CHANNEL_DOWN, totalWeight);
+            bt_set_weight(DISPLAY_CHANNEL_DOWN, totalWeight);
+
+            //check if we need do alarm
+            if ((config_get_alarm_enable()==1) && (work_status == WORK_STATUS_WORKING)) {
+                if (totalWeight >= config_get_alarm_weight()) {
+                    if (!alarmed ) {
+                        alarmNumber();
+                        alarmed = true;
+                    }
+                }else{
+                    alarmed = false;
+                }
+            }
         } else if (work_status == WORK_STATUS_CALIBRATION && calibrate_tick >=0 ) {
             calibrate_tick++;
             if (calibrate_step == CALIBRATION_STEP_INIT && calibrate_tick >= 5) {
@@ -483,11 +491,11 @@ void app_main()
             }
             if (calibrate_step < CALIBRATION_STEP_NUM && calibrate_tick >= 20) {
                 //set calibration
-                int32_t cal1 = gpio_adc_get_value();
-                int32_t cal2 = spi_adc_get_value();
-                ESP_LOGD(TAG,"%d: %d\n", cal1, cal2);
-                calibration_data[0][calibrate_step-CALIBRATION_STEP_ZERO] = cal1;
-                calibration_data[1][calibrate_step-CALIBRATION_STEP_ZERO] = cal2;
+                int32_t up = getAdcValue(SCALE_UP);
+                int32_t down = getAdcValue(SCALE_DOWN);
+                ESP_LOGD(TAG,"%d: %d\n", up, down);
+                calibration_data[SCALE_UP][calibrate_step-CALIBRATION_STEP_ZERO] = up;
+                calibration_data[SCALE_DOWN][calibrate_step-CALIBRATION_STEP_ZERO] = down;
                 display_setOperation(OPERATION_CALIBRATION, 255, 255, 255, CALIBRATION_STEP_NUM-calibrate_step-1);
                 beap(0, 200);
                 calibrate_step++;
@@ -496,7 +504,7 @@ void app_main()
             if (calibrate_step >= CALIBRATION_STEP_NUM) {
                 //exit calibration mode
                 ESP_LOGD(TAG,"exist calibration mode\n");
-                set_calibration(calibration_data[0], calibration_data[1]);
+                set_calibration(calibration_data[SCALE_UP], calibration_data[SCALE_DOWN]);
                 display_restore();
                 work_status = WORK_STATUS_NORMAL;
                 beap(100,400);

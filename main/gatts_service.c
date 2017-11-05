@@ -68,7 +68,7 @@ enum {
 
 enum {
     CONTROL_SET_ZERO,
-    CONTROL_ZERO_TRACK,
+    CONTROL_ZERO_TRACE,
     CONTROL_ALARM,
     CONTROL_WEIGHT_UNIT,
     CONTROL_ALARM_TIME,
@@ -439,7 +439,7 @@ static void init_weight_control_value(uint8_t* value, uint16_t* len)
     int index=0;
     value[index++] = CONTROL_OPT_READ;           //operation type
     value[index++] = CONTROL_STATUS_SUCCESS;     //operation status
-    value[index++] = config_get_zero_track();
+    value[index++] = config_get_zero_trace();
     value[index++] = config_get_alarm_enable();
     value[index++] = config_get_weight_unit();
     uint16_t alarm_time = config_get_alarm_time();
@@ -480,8 +480,8 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 send_key_event(keyEvent,false);
             }
             break;
-        case CONTROL_ZERO_TRACK:
-            config_set_zero_track(pData[1]);
+        case CONTROL_ZERO_TRACE:
+            config_set_zero_trace(pData[1]);
             break;
         case CONTROL_ALARM:
             config_set_alarm_enable(pData[1]);

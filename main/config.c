@@ -23,7 +23,7 @@
 
 #define TAG "CONFIG"
 
-#define KEY_ZERO_TRACK          "zero track"
+#define KEY_ZERO_TRACE          "zero trace"
 #define KEY_ALARM_ENABLE        "alarm enable"
 #define KEY_ALARM_TIME          "alarm time"
 #define KEY_ALARM_WEIGHT        "alarm weight"
@@ -33,7 +33,7 @@
 #define KEY_WIFI_PASS           "wifi pass"
 
 typedef struct {
-    uint8_t zero_track;
+    uint8_t zero_trace;
     uint8_t alarm_enable;
     uint16_t alarm_time;
     uint16_t alarm_weight;
@@ -67,9 +67,9 @@ bool config_write(char* name, int32_t value)
     return err == ESP_OK;
 }
 
-uint8_t config_get_zero_track()
+uint8_t config_get_zero_trace()
 {
-    return system_settings.zero_track;
+    return system_settings.zero_trace;
 }
 
 // num must be 7 bytes
@@ -83,12 +83,12 @@ void config_get_serial_num(char* serial_num, int len)
     sprintf(serial_num, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
-bool config_set_zero_track(uint8_t enable)
+bool config_set_zero_trace(uint8_t enable)
 {
     ESP_LOGD(TAG, "%s: %d\n", __func__, enable);
-    if (enable != system_settings.zero_track) {
-        system_settings.zero_track = enable;
-        esp_err_t err = nvs_set_u8(config_handle, KEY_ZERO_TRACK, enable);
+    if (enable != system_settings.zero_trace) {
+        system_settings.zero_trace = enable;
+        esp_err_t err = nvs_set_u8(config_handle, KEY_ZERO_TRACE, enable);
         if (err != ESP_OK) return false;
     }
     return true ;
@@ -252,10 +252,10 @@ void config_init()
     system_settings.firmware.host = NULL;
     system_settings.firmware.path = NULL;
 
-    //zero track enable
-    err = nvs_get_u8(config_handle, KEY_ZERO_TRACK, &system_settings.zero_track);
+    //zero trace enable
+    err = nvs_get_u8(config_handle, KEY_ZERO_TRACE, &system_settings.zero_trace);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
-    ESP_LOGI(TAG, "%s: zero_track: %d", __func__, system_settings.zero_track);
+    ESP_LOGI(TAG, "%s: zero_trace: %d", __func__, system_settings.zero_trace);
 
     //alarm enable
     err = nvs_get_u8(config_handle, KEY_ALARM_ENABLE, &system_settings.alarm_enable);
