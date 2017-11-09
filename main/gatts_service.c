@@ -516,7 +516,6 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
         case CONTROL_FW_UPGRADE:
             {
                 uint8_t host_len = pData[1];
-                config_set_wifi_name((char*)&pData[2],host_len);
                 uint16_t port_offset = 2+host_len;
                 uint8_t port = pData[port_offset];
                 uint16_t path_offset = port_offset+1;
