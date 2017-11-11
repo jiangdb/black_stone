@@ -411,10 +411,6 @@ void app_main()
     config_init();
     calibration_init();
 
-    /* Initialise adc */
-    spi_adc_init();
-    gpio_adc_init();
-
     /* Initialise wifi service*/
     ws_init();
 
@@ -423,6 +419,10 @@ void app_main()
 
     /* Initialise timer */
     bs_timer_init();
+
+    /* Initialise adc */
+    spi_adc_init();
+    gpio_adc_init();
 
     /* start display */
     display_start();

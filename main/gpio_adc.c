@@ -68,7 +68,7 @@ static int32_t gpioDataBuffer[BUFFER_SIZE];
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR data_isr_handler(void* arg)
+static void data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
@@ -217,8 +217,7 @@ static void gpio_adc_loop()
 
         /*
         int data_level = gpio_get_level(PIN_NUM_DATA);
-        printf("gpio isr interval: %d data level: %d\n",isrInterval, data_level);
-        // printf("%s: Got data on %d!!!\n", TAG, ch);
+        ESP_LOGD(TAG,"gpio isr interval: %d data level: %d",isrInterval, data_level);
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }
