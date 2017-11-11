@@ -27,7 +27,7 @@
 #define TAG  "MAIN"
 
 #define GPIO_LED_IO                 19
-#define DISPLAY_LOCK_THRESHOLD      15      //1.5g
+#define DISPLAY_LOCK_THRESHOLD      5       //0.5g
 #define DOUBLE_SCALE_THRESHOLD_G    500     //50g
 #define DOUBLE_SCALE_THRESHOLD_OZ   17      //1.7oz
 #define REPEAT_COUNT_CALIBRATION    6
