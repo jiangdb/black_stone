@@ -27,7 +27,7 @@
 #define TAG  "MAIN"
 
 #define GPIO_LED_IO                 19
-#define DISPLAY_LOCK_THRESHOLD      15      //1.5g
+#define DISPLAY_LOCK_THRESHOLD      5       //0.5g
 #define DOUBLE_SCALE_THRESHOLD_G    500     //50g
 #define DOUBLE_SCALE_THRESHOLD_OZ   17      //1.7oz
 #define REPEAT_COUNT_CALIBRATION    6
@@ -402,10 +402,6 @@ void app_main()
     config_init();
     calibration_init();
 
-    /* Initialise adc */
-    spi_adc_init();
-    gpio_adc_init();
-
     /* Initialise wifi service*/
     ws_init();
 
@@ -414,6 +410,10 @@ void app_main()
 
     /* Initialise timer */
     bs_timer_init();
+
+    /* Initialise adc */
+    spi_adc_init();
+    gpio_adc_init();
 
     /* start display */
     display_start();
