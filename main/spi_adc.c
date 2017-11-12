@@ -61,8 +61,8 @@ static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|C
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
-static uint32_t lastIsrTime=0;
-static uint32_t isrInterval=0;
+//static uint32_t lastIsrTime=0;
+//static uint32_t isrInterval=0;
 static TaskHandle_t xHandle = NULL;
 static int32_t spi_adc_value = 0;
 #if USE_QUEUE_BUFFER
@@ -78,9 +78,9 @@ static void data_isr_handler(void* arg)
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
+    //isrInterval = currtime - lastIsrTime;
+    //lastIsrTime = currtime;
     uint32_t diff=currtime-lastDataReadyTime;
-    isrInterval = (currtime - lastIsrTime)/240000;
-    lastIsrTime = currtime;
     if (diff < INT_VALID_INTERVAL_40HZ) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
@@ -94,12 +94,15 @@ static void gpio_spi_switch(uint8_t mode)
     esp_err_t ret;
     if (mode == DATA_PIN_FUNC_GPIO) {
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
-        ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+        ret = gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
         assert(ret==ESP_OK);
-        ret=gpio_intr_enable(PIN_NUM_DATA);
-        assert(ret==ESP_OK);
+        //ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+        //assert(ret==ESP_OK);
+        //ret=gpio_intr_enable(PIN_NUM_DATA);
+        //assert(ret==ESP_OK);
     }else if (mode == DATA_PIN_FUNC_SPI) {
-        ret=gpio_intr_disable(PIN_NUM_DATA);
+        //ret=gpio_intr_disable(PIN_NUM_DATA);
+        ret = gpio_isr_handler_remove(PIN_NUM_DATA);
         assert(ret==ESP_OK);
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
     }
@@ -230,7 +233,7 @@ static void spi_adc_loop()
 
         /*
         int data_level = gpio_get_level(PIN_NUM_DATA);
-        ESP_LOGD(TAG,"spi isr interval: %d data level: %d",isrInterval, data_level);
+        ESP_LOGD(TAG,"spi isr interval: %d data level: %d",isrInterval/240000, data_level);
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }
