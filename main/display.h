@@ -20,6 +20,12 @@ enum {
     OPERATION_UPGRADE,
 };
 
+enum {
+    ICON_WIFI,
+    ICON_SOUND,
+    ICON_ALL,
+};
+
 void display_init();
 void display_start();
 void display_stop();
@@ -29,6 +35,7 @@ void display_indicate_charging();
 void display_disable_charging();
 void display_backup();
 void display_restore();
+void display_seticon(int icon, bool on);
 void setDisplayNumber(uint8_t displayNum, int32_t value);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
