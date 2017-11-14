@@ -572,7 +572,8 @@ void display_start()
     setDisplayNumber(1,0);
 
     if (config_get_alarm_enable()) {
-        setWifiSound(1,1);
+        //setWifiSound(1,1);
+        display_seticon(ICON_SOUND,true);
     }
 
     //Create task

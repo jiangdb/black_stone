@@ -145,15 +145,19 @@ static void gpio_key_task(void* arg)
     }
 }
 
+void gpio_key_pre_stop()
+{
+    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
+    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
+    enable_beep_vibrate = false;
+}
+
 void gpio_key_stop()
 {
     if( xHandle != NULL )
     {
         vTaskDelete( xHandle );
     }
-    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
-    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
-    enable_beep_vibrate = false;
 }
 
 void gpio_key_start()
@@ -161,6 +165,7 @@ void gpio_key_start()
     gpio_set_level(GPIO_OUTPUT_IO_LED0, 1);
     gpio_set_level(GPIO_OUTPUT_IO_LED1, 1);
     enable_beep_vibrate = true;
+    beap(0, 200);
 }
 
 void gpio_key_init()

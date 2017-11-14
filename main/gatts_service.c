@@ -30,6 +30,7 @@
 #include "bs_timer.h"
 #include "config.h"
 #include "battery.h"
+#include "display.h"
 #include "key_event.h"
 
 /*
@@ -485,6 +486,11 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
             break;
         case CONTROL_ALARM:
             config_set_alarm_enable(pData[1]);
+            if (pData[1]) {
+                display_seticon(ICON_SOUND,true);
+            }else{
+                display_seticon(ICON_SOUND,false);
+            }
             break;
         case CONTROL_WEIGHT_UNIT:
             config_set_weight_unit(pData[1]);

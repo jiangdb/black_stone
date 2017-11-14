@@ -30,7 +30,7 @@ enum {
     ICON_WIFI,
     ICON_SOUND,
     ICON_ALL,
-}
+};
 
 void display_init();
 void display_start();

@@ -49,8 +49,9 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define USE_QUEUE_BUFFER          1
-#define BUFFER_SIZE               4
+#define USE_QUEUE_BUFFER      1
+#define BUFFER_SIZE           4
+#define DEBUG_ISR_INTVAL      0
 
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
 #define INT_VALID_INTERVAL_40HZ      (240000 * 15)   //15ms for 40HZ
@@ -61,8 +62,10 @@ static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|C
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
-//static uint32_t lastIsrTime=0;
-//static uint32_t isrInterval=0;
+#if DEBUG_ISR_INTVAL
+static uint32_t lastIsrTime=0;
+static uint32_t isrInterval=0;
+#endif
 static TaskHandle_t xHandle = NULL;
 static int32_t spi_adc_value = 0;
 #if USE_QUEUE_BUFFER
@@ -78,8 +81,10 @@ static void data_isr_handler(void* arg)
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
-    //isrInterval = currtime - lastIsrTime;
-    //lastIsrTime = currtime;
+#if DEBUG_ISR_INTVAL
+    isrInterval = currtime - lastIsrTime;
+    lastIsrTime = currtime;
+#endif
     uint32_t diff=currtime-lastDataReadyTime;
     if (diff < INT_VALID_INTERVAL_40HZ) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
@@ -231,9 +236,11 @@ static void spi_adc_loop()
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
 
-        /*
+#if DEBUG_ISR_INTVAL
         int data_level = gpio_get_level(PIN_NUM_DATA);
         ESP_LOGD(TAG,"spi isr interval: %d data level: %d",isrInterval/240000, data_level);
+#endif
+        /*
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }

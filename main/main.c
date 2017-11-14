@@ -27,10 +27,11 @@
 #define TAG  "MAIN"
 
 #define GPIO_LED_IO                 19
-#define DISPLAY_LOCK_THRESHOLD      5       //0.5g
-#define DOUBLE_SCALE_THRESHOLD_G    500     //50g
-#define DOUBLE_SCALE_THRESHOLD_OZ   17      //1.7oz
+#define DISPLAY_LOCK_THRESHOLD      5        //0.5g
+#define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
+#define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1z
 #define REPEAT_COUNT_CALIBRATION    6
+#define SLEEP_COUNT                 2
 
 enum {
     WROK_STATUS_INIT,
@@ -171,11 +172,7 @@ static void handle_key_event(void *arg)
                         if (keyEvent.key_value == KEY_DOWN) {
                             count_key_repeat();
                         }else if (keyEvent.key_value == KEY_UP) {
-                            if (trigger_sleep_count >= 1) {
-                                trigger_sleep_count = 0;
-                                // enter_sleep();
-                                done = true;
-                            } else if (key_repeat_count == REPEAT_COUNT_CALIBRATION) {
+                            if (key_repeat_count == REPEAT_COUNT_CALIBRATION) {
                                 //do calibration
                                 set_zero_count = -1; 
                                 ESP_LOGD(TAG,"enter calibration mode\n");
@@ -188,6 +185,9 @@ static void handle_key_event(void *arg)
                             }
                         } else if (keyEvent.key_value == KEY_HOLD) {
                             trigger_sleep_count++;
+                            if (trigger_sleep_count >= SLEEP_COUNT) {
+                                done = true;
+                            }
                         }
                         break;
                     case SLEEP_KEY:
@@ -216,16 +216,15 @@ static void handle_key_event(void *arg)
                         break;
                     case CLEAR_KEY:
                         if (keyEvent.key_value == KEY_UP) {
-                            if (trigger_sleep_count >= 1) {
-                                trigger_sleep_count = 0;
-                                // enter_sleep();
-                                done = true;
-                            } else {
+                            if (trigger_sleep_count < SLEEP_COUNT) {
                                 //start count for set zero
                                 set_zero_count = 0; 
                             }
                         } else if (keyEvent.key_value == KEY_HOLD) {
                             trigger_sleep_count++;
+                            if (trigger_sleep_count >= SLEEP_COUNT) {
+                                done = true;
+                            }
                         }
                         break;
                     case SLEEP_KEY:
@@ -325,6 +324,7 @@ static bool detectDualScale()
     uint8_t weightUnit = config_get_weight_unit();
     if (((weightUnit == WEIGHT_UNIT_G) && (absWeight > DOUBLE_SCALE_THRESHOLD_G))
             || ((weightUnit == WEIGHT_UNIT_OZ) && (absWeight > DOUBLE_SCALE_THRESHOLD_OZ))) {
+        display_seticon(ICON_ALL, true);
         return true;
     }
     return false;
@@ -402,6 +402,11 @@ void app_main()
     config_init();
     calibration_init();
 
+    /* Initialise adc */
+    spi_adc_init();
+    gpio_adc_init();
+    vTaskDelay(10/portTICK_RATE_MS);
+
     /* Initialise wifi service*/
     ws_init();
 
@@ -411,10 +416,6 @@ void app_main()
     /* Initialise timer */
     bs_timer_init();
 
-    /* Initialise adc */
-    spi_adc_init();
-    gpio_adc_init();
-
     /* start display */
     display_start();
     if (is_charging()) {
@@ -423,12 +424,15 @@ void app_main()
 
     ESP_LOGD(TAG,"enter main loop!!!\n");
     int32_t calibration_data[SCALE_NUM][CALIBRATION_NUMS] = {0};
-    bool dualScale = detectDualScale();
 
     work_status = WORK_STATUS_NORMAL;
+    bool dualScale = false;
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
+            if (!dualScale) {
+                dualScale = detectDualScale();
+            }
             int32_t upAdcValue = 0;
             if (dualScale) {
                 upAdcValue = getAdcValue(SCALE_UP);
@@ -438,7 +442,7 @@ void app_main()
                 set_zero_count++;
             }
             //hanlde set zero first
-            if (set_zero_count > 10) {
+            if (set_zero_count > 5) {
                 if (dualScale) {
                     cal_set_zero(SCALE_UP, upAdcValue);
                     setDisplayNumber(DISPLAY_CHANNEL_UP, 0);
@@ -514,6 +518,7 @@ void app_main()
 
     ESP_LOGD(TAG,"quit main loop\n");
     work_status = WORK_STATUS_SHUTDOWN;
+    done = false;       //should wait for up
 
     spi_adc_shutdown();
     gpio_adc_shutdown();
@@ -524,7 +529,6 @@ void app_main()
         firmware_t* firmware = config_get_firmware_upgrade();
         if (firmware->host != NULL) {
             if (!ota_task(firmware)){
-                done = false;
                 while(!done) {
                     vTaskDelay(100/portTICK_RATE_MS);
                 }
@@ -533,6 +537,11 @@ void app_main()
     }
     display_stop();
     ws_stop();
+    gpio_key_pre_stop();
+    // wait for power key up
+    while(!done) {
+        vTaskDelay(100/portTICK_RATE_MS);
+    }
     gpio_key_stop();
     if( xHandle != NULL ) vTaskDelete( xHandle );
     battery_stop();
