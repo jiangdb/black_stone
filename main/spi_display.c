@@ -78,6 +78,7 @@
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
+#define ICON_ADDRESS            14
 
 enum {
     ALARM_TIME,
@@ -289,6 +290,18 @@ void setWifiSound(int wifiSound, bool enable)
         val &= (~(1<<bit));
     }
     display_data[WIRELESS_ADDRESS] = val;
+}
+
+void display_seticon(int icon, bool on)
+{
+    uint8_t val = display_data[ICON_ADDRESS];
+
+    if (on) {
+        val |= 1<<icon;
+    }else{
+        val &= (~(1<<icon));
+    }
+    display_data[ICON_ADDRESS] = val;
 }
 
 void display_setOperation(int operation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)

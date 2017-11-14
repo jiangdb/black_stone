@@ -9,12 +9,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "key_event.h"
 #include "key.h"
+
+#define TAG  "KEY"
 
 static TaskHandle_t xHandle = NULL;
 static xQueueHandle gpio_evt_queue = NULL;
@@ -72,7 +75,7 @@ static void gpio_key_task(void* arg)
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
-            // printf("gpio_key(%d): %d !!!\n", io_num, val);
+            // ESP_LOGI(TAG,"gpio_key(%d): %d !!!", io_num, val);
             if (io_num == GPIO_INPUT_IO_STATE1 || io_num == GPIO_INPUT_IO_STATE2 ) {
                 //got charging status change
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
@@ -120,7 +123,7 @@ static void gpio_key_task(void* arg)
                     tick_type = portMAX_DELAY;
                 } else {
                     //start tick
-                    tick_type = ( TickType_t ) 0;
+                    tick_type = ( TickType_t ) 50/portTICK_RATE_MS;
                 }
             }
         }
@@ -138,7 +141,7 @@ static void gpio_key_task(void* arg)
                 }
             }
         }
-        vTaskDelay(50/portTICK_RATE_MS);
+        //vTaskDelay(50/portTICK_RATE_MS);
     }
 }
 
