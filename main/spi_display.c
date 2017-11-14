@@ -78,6 +78,7 @@
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
 #define WIRELESS_ADDRESS        14
+#define ICON_ADDRESS            14
 
 enum {
     ALARM_TIME,
@@ -139,21 +140,21 @@ static void clear_display_data(bool leaveBattery);
 **
 ** Description      display value.
 **
-** Parameter        displayNum: display number.
+** Parameter        displayCh: display number.
 **                  value: value should be displayed, in 100mg.
 **
 ** Returns          weight in 0.1g.
 **
 *******************************************************************************/
-void setDisplayNumber(uint8_t displayNum, int32_t value)
+void setDisplayNumber(uint8_t displayCh, int32_t value)
 {
     int8_t data[DIGITAL_NUMBER];
     int8_t precision;
 
     //remember value
-    siWeights[displayNum] = value;
+    siWeights[displayCh] = value;
 
-    // ESP_LOGD(TAG,"setDisplayInteger(%d, %d)!!!\n", displayNum, value);
+    // ESP_LOGD(TAG,"setDisplayInteger(%d, %d)!!!\n", displayCh, value);
     if (value >= 99990) { value = 9999; precision=0;}
     else if (value > 9999) { value /= 10; precision=0;}
     else if (value > -1000) { precision=1;}
@@ -162,7 +163,7 @@ void setDisplayNumber(uint8_t displayNum, int32_t value)
 
     if (value == 0) {
         //show 0.0
-        int start = 1+DIGITAL_NUMBER*displayNum;
+        int start = 1+DIGITAL_NUMBER*displayCh;
         display_data[start] = NUMBER_OFF;
         display_data[start+1] = NUMBER_OFF;
         display_data[start+2] = NUMBER_0;
@@ -173,7 +174,7 @@ void setDisplayNumber(uint8_t displayNum, int32_t value)
 
     if (value < 10 && value > -10) {
         //show 0.*
-        int start = 1+DIGITAL_NUMBER*displayNum;
+        int start = 1+DIGITAL_NUMBER*displayCh;
         display_data[start] = NUMBER_OFF;
         display_data[start+1] = (value < 0) ? OPT_DASH:NUMBER_OFF;
         display_data[start+2] = NUMBER_0;
@@ -197,7 +198,7 @@ void setDisplayNumber(uint8_t displayNum, int32_t value)
     }
 
     //set display data
-    int start = 1+DIGITAL_NUMBER*displayNum;
+    int start = 1+DIGITAL_NUMBER*displayCh;
     for (int j=0; j<DIGITAL_NUMBER; j++) {
         if (data[j] == -2){
             display_data[start+j] = NUMBER_OFF;
@@ -289,6 +290,18 @@ void setWifiSound(int wifiSound, bool enable)
         val &= (~(1<<bit));
     }
     display_data[WIRELESS_ADDRESS] = val;
+}
+
+void display_seticon(int icon, bool on)
+{
+    uint8_t val = display_data[ICON_ADDRESS];
+
+    if (on) {
+        val |= 1<<icon;
+    }else{
+        val &= (~(1<<icon));
+    }
+    display_data[ICON_ADDRESS] = val;
 }
 
 void display_setOperation(int operation, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
@@ -559,7 +572,8 @@ void display_start()
     setDisplayNumber(1,0);
 
     if (config_get_alarm_enable()) {
-        setWifiSound(1,1);
+        //setWifiSound(1,1);
+        display_seticon(ICON_SOUND,true);
     }
 
     //Create task

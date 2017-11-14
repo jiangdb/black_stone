@@ -56,8 +56,8 @@ static const uint8_t channel_config = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|CH
 //The semaphore indicating the data is ready.
 static SemaphoreHandle_t dataReadySem = NULL;
 static uint32_t lastDataReadyTime;
-static uint32_t lastIsrTime=0;
-static uint32_t isrInterval=0;
+//static uint32_t lastIsrTime=0;
+//static uint32_t isrInterval=0;
 static TaskHandle_t xReaderTaskHandle = NULL;
 static int32_t gpio_adc_value = 0;
 #if USE_QUEUE_BUFFER
@@ -68,14 +68,14 @@ static int32_t gpioDataBuffer[BUFFER_SIZE];
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR data_isr_handler(void* arg)
+static void data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
     uint32_t diff=currtime-lastDataReadyTime;
-    isrInterval = (currtime - lastIsrTime)/240000;
-    lastIsrTime = currtime;
+    //isrInterval = currtime - lastIsrTime;
+    //lastIsrTime = currtime;
     if (diff < INT_VALID_INTERVAL_40HZ) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
@@ -201,10 +201,10 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_GpioAdcData, value);
     value = queue_get_value(&qb_GpioAdcData, ALG_MEDIAN_VALUE);
 #endif
-    if (abs(gpio_adc_value - value) >=2 ) {
+    //if (abs(gpio_adc_value - value) >=2 ) {
         gpio_adc_value = value;
         //printf("gpio_adc_value: %d\n", gpio_adc_value);
-    }
+    //}
 }
 
 static void gpio_adc_loop()
@@ -217,14 +217,13 @@ static void gpio_adc_loop()
 
         /*
         int data_level = gpio_get_level(PIN_NUM_DATA);
-        printf("gpio isr interval: %d data level: %d\n",isrInterval, data_level);
-        // printf("%s: Got data on %d!!!\n", TAG, ch);
+        ESP_LOGD(TAG,"gpio isr interval: %d data level: %d",isrInterval/240000, data_level);
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }
         */
         //Disable data int
-        gpio_intr_disable(PIN_NUM_DATA);
+        gpio_isr_handler_remove(PIN_NUM_DATA);
 
         if (!configed) {
             config(channel_config);
@@ -237,7 +236,7 @@ static void gpio_adc_loop()
         vTaskDelay(10/portTICK_RATE_MS);
 
         //Enable data int
-        gpio_intr_enable(PIN_NUM_DATA);
+        gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
     }
 }
 

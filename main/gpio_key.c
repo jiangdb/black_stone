@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -16,11 +17,13 @@
 #include "key_event.h"
 #include "key.h"
 
+#define TAG  "KEY"
+
 static TaskHandle_t xHandle = NULL;
 static xQueueHandle gpio_evt_queue = NULL;
 static bool enable_beep_vibrate = false;
 
-static void IRAM_ATTR gpio_isr_handler(void* arg)
+static void gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
@@ -72,7 +75,7 @@ static void gpio_key_task(void* arg)
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
-            // printf("gpio_key(%d): %d !!!\n", io_num, val);
+            // ESP_LOGI(TAG,"gpio_key(%d): %d !!!", io_num, val);
             if (io_num == GPIO_INPUT_IO_STATE1 || io_num == GPIO_INPUT_IO_STATE2 ) {
                 //got charging status change
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
@@ -120,7 +123,7 @@ static void gpio_key_task(void* arg)
                     tick_type = portMAX_DELAY;
                 } else {
                     //start tick
-                    tick_type = ( TickType_t ) 0;
+                    tick_type = ( TickType_t ) 50/portTICK_RATE_MS;
                 }
             }
         }
@@ -138,8 +141,15 @@ static void gpio_key_task(void* arg)
                 }
             }
         }
-        vTaskDelay(50/portTICK_RATE_MS);
+        //vTaskDelay(50/portTICK_RATE_MS);
     }
+}
+
+void gpio_key_pre_stop()
+{
+    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
+    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
+    enable_beep_vibrate = false;
 }
 
 void gpio_key_stop()
@@ -148,9 +158,6 @@ void gpio_key_stop()
     {
         vTaskDelete( xHandle );
     }
-    gpio_set_level(GPIO_OUTPUT_IO_LED0, 0);
-    gpio_set_level(GPIO_OUTPUT_IO_LED1, 0);
-    enable_beep_vibrate = false;
 }
 
 void gpio_key_start()
@@ -158,6 +165,7 @@ void gpio_key_start()
     gpio_set_level(GPIO_OUTPUT_IO_LED0, 1);
     gpio_set_level(GPIO_OUTPUT_IO_LED1, 1);
     enable_beep_vibrate = true;
+    beap(0, 200);
 }
 
 void gpio_key_init()

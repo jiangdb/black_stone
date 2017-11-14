@@ -49,8 +49,9 @@
 #define CH_SEL_TEMP           0x2
 #define CH_SEL_SHORT          0x3
 
-#define USE_QUEUE_BUFFER          1
-#define BUFFER_SIZE               4
+#define USE_QUEUE_BUFFER      1
+#define BUFFER_SIZE           4
+#define DEBUG_ISR_INTVAL      0
 
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
 #define INT_VALID_INTERVAL_40HZ      (240000 * 15)   //15ms for 40HZ
@@ -61,8 +62,10 @@ static const uint8_t channel_configs = (0x00|REFO_ON|SPEED_SEL_40HZ|PGA_SEL_64|C
 static SemaphoreHandle_t rdySem = NULL;
 static spi_device_handle_t spi;
 static uint32_t lastDataReadyTime;
+#if DEBUG_ISR_INTVAL
 static uint32_t lastIsrTime=0;
 static uint32_t isrInterval=0;
+#endif
 static TaskHandle_t xHandle = NULL;
 static int32_t spi_adc_value = 0;
 #if USE_QUEUE_BUFFER
@@ -73,14 +76,16 @@ static int32_t spiDataBuffer[BUFFER_SIZE];
 /*
 This ISR is called when the data line goes low.
 */
-static void IRAM_ATTR data_isr_handler(void* arg)
+static void data_isr_handler(void* arg)
 {
     //Sometimes due to interference or ringing or something, we get two irqs after eachother. This is solved by
     //looking at the time between interrupts and refusing any interrupt too close to another one.
     uint32_t currtime=xthal_get_ccount();
-    uint32_t diff=currtime-lastDataReadyTime;
-    isrInterval = (currtime - lastIsrTime)/240000;
+#if DEBUG_ISR_INTVAL
+    isrInterval = currtime - lastIsrTime;
     lastIsrTime = currtime;
+#endif
+    uint32_t diff=currtime-lastDataReadyTime;
     if (diff < INT_VALID_INTERVAL_40HZ) return; //ignore everything between valid interval
     lastDataReadyTime=currtime;
     //Give the semaphore.
@@ -94,12 +99,15 @@ static void gpio_spi_switch(uint8_t mode)
     esp_err_t ret;
     if (mode == DATA_PIN_FUNC_GPIO) {
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
-        ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+        ret = gpio_isr_handler_add(PIN_NUM_DATA, data_isr_handler, NULL);
         assert(ret==ESP_OK);
-        ret=gpio_intr_enable(PIN_NUM_DATA);
-        assert(ret==ESP_OK);
+        //ret=gpio_set_direction(PIN_NUM_DATA,GPIO_MODE_INPUT);
+        //assert(ret==ESP_OK);
+        //ret=gpio_intr_enable(PIN_NUM_DATA);
+        //assert(ret==ESP_OK);
     }else if (mode == DATA_PIN_FUNC_SPI) {
-        ret=gpio_intr_disable(PIN_NUM_DATA);
+        //ret=gpio_intr_disable(PIN_NUM_DATA);
+        ret = gpio_isr_handler_remove(PIN_NUM_DATA);
         assert(ret==ESP_OK);
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[PIN_NUM_DATA], mode);
     }
@@ -171,10 +179,10 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_SpiAdcData, value);
     value = queue_get_value(&qb_SpiAdcData, ALG_MEDIAN_VALUE);
 #endif
-    if (abs(spi_adc_value - value) >=2 ) {
+    //if (abs(spi_adc_value - value) >=2 ) {
         spi_adc_value = value;
         //ESP_LOGD(TAG,"spi_adc_value: %d\n", spi_adc_value);
-    }
+    //}
 }
 
 static void spi_init()
@@ -228,9 +236,11 @@ static void spi_adc_loop()
         //Wait until data is ready
         xSemaphoreTake( rdySem, portMAX_DELAY );
 
-        /*
+#if DEBUG_ISR_INTVAL
         int data_level = gpio_get_level(PIN_NUM_DATA);
-        ESP_LOGD(TAG,"spi isr interval: %d data level: %d\n",isrInterval, data_level);
+        ESP_LOGD(TAG,"spi isr interval: %d data level: %d",isrInterval/240000, data_level);
+#endif
+        /*
         if(gpio_get_level(PIN_NUM_DATA) == 1) {
             continue;
         }

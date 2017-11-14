@@ -30,6 +30,7 @@
 #include "bs_timer.h"
 #include "config.h"
 #include "battery.h"
+#include "display.h"
 #include "key_event.h"
 
 /*
@@ -68,7 +69,7 @@ enum {
 
 enum {
     CONTROL_SET_ZERO,
-    CONTROL_ZERO_TRACK,
+    CONTROL_ZERO_TRACE,
     CONTROL_ALARM,
     CONTROL_WEIGHT_UNIT,
     CONTROL_ALARM_TIME,
@@ -439,7 +440,7 @@ static void init_weight_control_value(uint8_t* value, uint16_t* len)
     int index=0;
     value[index++] = CONTROL_OPT_READ;           //operation type
     value[index++] = CONTROL_STATUS_SUCCESS;     //operation status
-    value[index++] = config_get_zero_track();
+    value[index++] = config_get_zero_trace();
     value[index++] = config_get_alarm_enable();
     value[index++] = config_get_weight_unit();
     uint16_t alarm_time = config_get_alarm_time();
@@ -480,11 +481,16 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 send_key_event(keyEvent,false);
             }
             break;
-        case CONTROL_ZERO_TRACK:
-            config_set_zero_track(pData[1]);
+        case CONTROL_ZERO_TRACE:
+            config_set_zero_trace(pData[1]);
             break;
         case CONTROL_ALARM:
             config_set_alarm_enable(pData[1]);
+            if (pData[1]) {
+                display_seticon(ICON_SOUND,true);
+            }else{
+                display_seticon(ICON_SOUND,false);
+            }
             break;
         case CONTROL_WEIGHT_UNIT:
             config_set_weight_unit(pData[1]);
@@ -516,7 +522,6 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
         case CONTROL_FW_UPGRADE:
             {
                 uint8_t host_len = pData[1];
-                config_set_wifi_name((char*)&pData[2],host_len);
                 uint16_t port_offset = 2+host_len;
                 uint8_t port = pData[port_offset];
                 uint16_t path_offset = port_offset+1;

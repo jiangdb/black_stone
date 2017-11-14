@@ -85,8 +85,13 @@ void set_calibration(int32_t channel0[3], int32_t channel1[3])
     ESP_LOGD(TAG,"calibrations: %d, %d --  %d, %d\n", channel0[1], channel0[2],channel1[1],channel1[2]);
     absZero[0] = channel0[0];
     absZero[1] = channel1[0];
+    cal_set_zero(0, channel0[0]);
+    cal_set_zero(1, channel1[0]);
+
     config_write(CONFIG_CHANNEL_0_ABS_ZERO, channel0[0]);
     config_write(CONFIG_CHANNEL_1_ABS_ZERO, channel1[0]);
+    cal_set_zero(0, channel0[0]);
+    cal_set_zero(1, channel1[0]);
 
     cal[0] = channel0[2]-channel0[1];
     cal[1] = channel1[2]-channel1[1];

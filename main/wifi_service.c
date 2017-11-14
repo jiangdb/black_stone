@@ -33,7 +33,8 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             if (wifi_status != WIFI_STATUS_CONNECTED) {
                 wifi_status = WIFI_STATUS_CONNECTED;
                 bt_notify_wifi_status(wifi_status);
-                setWifiSound(0, true);
+                //setWifiSound(0, true);
+                display_seticon(ICON_WIFI, true);
             }
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_GOT_IP");
             ESP_LOGD(TAG, "got ip:%s\n",ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
@@ -42,7 +43,8 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
             if (wifi_status != WIFI_STATUS_DISCONNECTED) {
                 wifi_status = WIFI_STATUS_DISCONNECTED;
                 bt_notify_wifi_status(wifi_status);
-                setWifiSound(0, false);
+                //setWifiSound(0, false);
+                display_seticon(ICON_WIFI, false);
             }
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_DISCONNECTED");
             xSemaphoreGive(connectSem);
