@@ -14,8 +14,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
-#include "soc/gpio_struct.h"
-#include "driver/gpio.h"
 #include "config.h"
 #include "display.h"
 #include "battery.h"

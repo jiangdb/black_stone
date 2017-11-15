@@ -31,8 +31,6 @@ void cal_set_zero(int channel, int32_t adcValue)
     if(channel<0||channel>1) return;
 
     zero[channel] = adcValue;
-
-    //config_write(config_zero_name[channel], zero[channel]);
     ESP_LOGD(TAG,"set zero[%d]: %d\n", channel, zero[channel]);
 }
 
@@ -98,10 +96,6 @@ void set_calibration(int32_t channel0[3], int32_t channel1[3])
 void calibration_init()
 {
     ESP_LOGD(TAG,"%s\n", __func__);
-
-    //zero[0] = config_read(CONFIG_CHANNEL_0_ZERO, 0);
-    //zero[1] = config_read(CONFIG_CHANNEL_1_ZERO, 0);
-    //ESP_LOGD(TAG,"get zero: %d, %d\n", zero[0], zero[1]);
 
     absZero[0] = config_read(CONFIG_CHANNEL_0_ABS_ZERO, 0);
     absZero[1] = config_read(CONFIG_CHANNEL_1_ABS_ZERO, 0);

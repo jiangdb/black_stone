@@ -162,7 +162,6 @@ void bs_timer_stop(bs_timer_e timer)
     sTimers[timer].timer_enabled = false;
     if (timer == TIMER_STOPWATCH) {
         seconds = 0;
-        ESP_LOGI(TAG,"set display time to 0 \n");
         setDisplayTime(seconds);
     }
 }
