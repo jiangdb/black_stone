@@ -11,18 +11,16 @@ enum {
 	CHARGE_KEY,
 	NOT_CHARGE_KEY,
 	FIRMWARE_UPGRADE_KEY,
+    KEY_TYPE_MAX
 };
 
-// #define TIMER_KEY		 1
-// #define CLEAR_KEY   	 2
-// #define SLEEP_KEY   	 3
-// #define CHARGE_KEY   	 4
-// #define NOT_CHARGE_KEY   5
-
 /* KEY VALUE */
-#define KEY_UP		0
-#define KEY_HOLD	1
-#define KEY_DOWN	2
+enum {
+    KEY_UP,
+    KEY_HOLD,
+    KEY_DOWN,
+    KEY_VALUE_MAX
+};
 
 typedef struct {
 	int8_t key_type;
