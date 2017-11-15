@@ -32,6 +32,7 @@
 #define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1oz
 #define REPEAT_COUNT_CALIBRATION    6
 #define SLEEP_COUNT                 3
+#define SET_ZERO_COUNT              5       //500ms
 #define SCALE_UP_MAX_WEIGHT_G       10000   //1kg
 #define SCALE_UP_MAX_WEIGHT_OZ      352     //35.2oz
 #define SCALE_DOWN_MAX_WEIGHT_G     20000   //2kg
@@ -68,6 +69,7 @@ static int display_lock_count[2] = {0,0};
 static int set_zero_count = -1;
 static int32_t lock_weight[2] = {0,0};
 static bool done = false;
+static bool auto_shutdown = false;
 static int trigger_sleep_count = 0;
 static int cal_key_repeat_count = -1;
 static int work_status = WROK_STATUS_INIT;
@@ -186,6 +188,7 @@ static void handle_key_event(void *arg)
                     case SLEEP_KEY:
                     case FIRMWARE_UPGRADE_KEY:
                         done = true;
+                        auto_shutdown = true;
                         break;
                     case CHARGE_KEY:
                         display_indicate_charging();
@@ -208,6 +211,7 @@ static void handle_key_event(void *arg)
                             }
                             timer_hold = false;
                         }else if (keyEvent.key_value == KEY_HOLD) {
+                            ESP_LOGI(TAG,"reset timer\n");
                             bs_timer_stop(TIMER_STOPWATCH);
                             timer_hold = true;
                         }
@@ -228,6 +232,7 @@ static void handle_key_event(void *arg)
                     case SLEEP_KEY:
                     case FIRMWARE_UPGRADE_KEY:
                         done = true;
+                        auto_shutdown = true;
                         break;
                     case CHARGE_KEY:
                         display_indicate_charging();
@@ -298,6 +303,8 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
         if (abs(lock_weight[scaleChannel]-weight) > 5){
             display_lock_count[scaleChannel] = 0;
             lock_weight[scaleChannel] = weight;
+            //reset timeout timer
+            bs_timer_reset(TIMER_TIMEOUT);
         }else{
             display_lock_count[scaleChannel]++;
             //3s not change, lock display
@@ -313,6 +320,8 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
         if ((abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD)) {
             lock_display(scaleChannel, false);
             lock_weight[scaleChannel] = weight;
+            //reset timeout timer
+            bs_timer_reset(TIMER_TIMEOUT);
         }
         //return locked value
         rtn = lock_weight[scaleChannel];
@@ -477,7 +486,7 @@ void app_main()
                 set_zero_count++;
             }
             //hanlde set zero first
-            if (set_zero_count > 5) {
+            if (set_zero_count > SET_ZERO_COUNT) {
                 if (dualScale) {
                     cal_set_zero(SCALE_UP, upAdcValue);
                     setDisplayNumber(DISPLAY_CHANNEL_UP, 0);
@@ -559,7 +568,9 @@ void app_main()
 
     ESP_LOGD(TAG,"quit main loop\n");
     work_status = WORK_STATUS_SHUTDOWN;
-    done = false;       //should wait for up
+    if (!auto_shutdown) {
+        done = false;       //should wait for up
+    }
 
     spi_adc_shutdown();
     gpio_adc_shutdown();
