@@ -74,6 +74,7 @@
 
 #define CHAR_C                  0x39
 #define CHAR_E                  0x79
+#define CHAR_F                  0x71
 
 #define DIGITAL_NUMBER          4
 #define BATTERY_ADDRESS         13
@@ -169,6 +170,16 @@ void setDisplayNumber(uint8_t displayCh, int32_t value)
         display_data[start+2] = NUMBER_0;
         display_data[start+2] |= 0x80;
         display_data[start+3] = NUMBER_0;
+        return;
+    }
+
+    if (value == 9999) {
+        //show FFFF
+        int start = 1+DIGITAL_NUMBER*displayCh;
+        display_data[start] = CHAR_F;
+        display_data[start+1] = CHAR_F;
+        display_data[start+2] = CHAR_F;
+        display_data[start+3] = CHAR_F;
         return;
     }
 

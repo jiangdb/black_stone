@@ -29,11 +29,13 @@
 #define GPIO_LED_IO                 19
 #define DISPLAY_LOCK_THRESHOLD      5        //0.5g
 #define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
-#define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1z
+#define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1oz
 #define REPEAT_COUNT_CALIBRATION    6
 #define SLEEP_COUNT                 3
-#define SCALE_UP_MAX_WEIGHT         10000   //1kg
-#define SCALE_DOWN_MAX_WEIGHT       20000   //2kg
+#define SCALE_UP_MAX_WEIGHT_G       10000   //1kg
+#define SCALE_UP_MAX_WEIGHT_OZ      352     //35.2oz
+#define SCALE_DOWN_MAX_WEIGHT_G     20000   //2kg
+#define SCALE_DOWN_MAX_WEIGHT_OZ    704     //70.4oz
 
 enum {
     WROK_STATUS_INIT,
@@ -335,6 +337,32 @@ static bool detectDualScale()
     return false;
 }
 
+static bool scaleOverFlow(uint8_t scaleChannel, int32_t scaleWeight)
+{
+    uint8_t weightUnit = config_get_weight_unit();
+    int32_t maxWeight = 0;
+
+    switch(scaleChannel) {
+        case SCALE_UP:
+            if (weightUnit == WEIGHT_UNIT_G) {
+                maxWeight = SCALE_UP_MAX_WEIGHT_G;
+            }else{
+                maxWeight = SCALE_UP_MAX_WEIGHT_OZ;
+            }
+            break;
+        case SCALE_DOWN:
+            if (weightUnit == WEIGHT_UNIT_G) {
+                maxWeight = SCALE_DOWN_MAX_WEIGHT_G;
+            }else{
+                maxWeight = SCALE_DOWN_MAX_WEIGHT_OZ;
+            }
+            break;
+        default:
+            return false;
+    }
+    return scaleWeight > maxWeight;
+}
+
 void app_main()
 {
     ESP_LOGI(TAG, "BLACK STONE!!!");
@@ -410,7 +438,7 @@ void app_main()
     /* Initialise adc */
     spi_adc_init();
     gpio_adc_init();
-    vTaskDelay(10/portTICK_RATE_MS);
+    vTaskDelay(1/portTICK_RATE_MS);
 
     /* Initialise wifi service*/
     ws_init();
@@ -466,8 +494,14 @@ void app_main()
 
             int32_t upWight = 0;
             int32_t downWeight = parseAdcValue(SCALE_DOWN, downAdcValue);
+            if (scaleOverFlow(SCALE_DOWN, downWeight)) {
+                downWeight = 100000;
+            }
             if (dualScale) {
                 upWight = parseAdcValue(SCALE_UP, upAdcValue);
+                if (scaleOverFlow(SCALE_UP, upWight)) {
+                    upWight = 100000;
+                }
                 setDisplayNumber(DISPLAY_CHANNEL_UP, downWeight);
                 bt_set_weight(DISPLAY_CHANNEL_UP, downWeight);
             }
