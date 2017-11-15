@@ -47,6 +47,8 @@ typedef struct {
 static nvs_handle config_handle;
 static system_settings_t system_settings;
 
+extern void led_enable(bool enable);
+
 int32_t config_read(char* name, int32_t default_value)
 {
     int32_t value = default_value;
@@ -155,6 +157,12 @@ bool config_set_weight_unit(uint8_t unit)
         system_settings.weight_unit = unit;
         esp_err_t err = nvs_set_u8(config_handle, KEY_WEIGHT_UNIT, unit);
         if (err != ESP_OK) return false;
+
+        if (system_settings.weight_unit == WEIGHT_UNIT_G) {
+            led_enable(false);
+        }else{
+            led_enable(true);
+        }
     }
     return true;
 }

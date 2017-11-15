@@ -30,7 +30,7 @@
 #define DISPLAY_LOCK_THRESHOLD      5        //0.5g
 #define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
 #define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1oz
-#define REPEAT_COUNT_CALIBRATION    6
+#define REPEAT_COUNT_CALIBRATION    7
 #define SLEEP_COUNT                 3
 #define SET_ZERO_COUNT              5       //500ms
 #define SCALE_UP_MAX_WEIGHT_G       10000   //1kg
@@ -78,6 +78,33 @@ static bool no_key_start = true;
 static bool alarmed = false;
 static xQueueHandle eventQueue;
 static TaskHandle_t xHandle = NULL;
+
+static void led_init()
+{
+    //GPIO config for the data line.
+    gpio_config_t io_conf={
+        .intr_type=GPIO_PIN_INTR_DISABLE,
+        .mode=GPIO_MODE_OUTPUT,
+        .pull_down_en=0,
+        .pull_up_en=0,
+        .pin_bit_mask=(1<<GPIO_LED_IO)
+    };
+
+    //Set up handshake line interrupt.
+    gpio_config(&io_conf);
+
+    if (config_get_weight_unit() == WEIGHT_UNIT_OZ) {
+        gpio_set_level(GPIO_LED_IO, 1);
+    }
+}
+
+void led_enable(bool enable)
+{
+    if (enable) 
+        gpio_set_level(GPIO_LED_IO, 1);
+    else
+        gpio_set_level(GPIO_LED_IO, 0);
+}
 
 static void lock_display(int channel, bool lock)
 {
@@ -211,7 +238,6 @@ static void handle_key_event(void *arg)
                             }
                             timer_hold = false;
                         }else if (keyEvent.key_value == KEY_HOLD) {
-                            ESP_LOGI(TAG,"reset timer\n");
                             bs_timer_stop(TIMER_STOPWATCH);
                             timer_hold = true;
                         }
@@ -300,7 +326,7 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
     if (!display_lock[scaleChannel]) {
         //not locked
         // change more than 0.5g, clear count, else increase
-        if (abs(lock_weight[scaleChannel]-weight) > 5){
+        if (abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD){
             display_lock_count[scaleChannel] = 0;
             lock_weight[scaleChannel] = weight;
             //reset timeout timer
@@ -443,6 +469,9 @@ void app_main()
     /* config */
     config_init();
     calibration_init();
+
+    /* Init weight unit LED */
+    led_init();
 
     /* Initialise adc */
     spi_adc_init();
