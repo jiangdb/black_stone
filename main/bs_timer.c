@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include "esp_types.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -19,6 +20,7 @@
 #include "display.h"
 #include "key_event.h"
 
+#define TAG  "TIMER"
 /*
  * DEFINES
  */
@@ -26,7 +28,8 @@
 #define TIMER_DIVIDER           80               /*!< Hardware timer clock divider */
 #define TIMER_SCALE             (TIMER_BASE_CLK / TIMER_DIVIDER)  /*!< used to calculate counter value */
 #define TIMER_INTERVAL_1_SEC    (1)     /*!< 1s */
-#define TIMER_INTERVAL_5_MIN    (300)   /*!< 3m */
+#define TIMER_INTERVAL_1_MIN    (60)    /*!< 1m */
+#define TIMER_INTERVAL_5_MIN    (300)   /*!< 5m */
 
 /*
  * STRUCTS and ENUMS
@@ -154,14 +157,13 @@ void bs_timer_start(bs_timer_e timer)
 
 void bs_timer_stop(bs_timer_e timer)
 {
-    if (sTimers[timer].timer_enabled) {
-        timer_pause(sTimers[timer].timer_group, sTimers[timer].timer_idx);
-        timer_set_counter_value(sTimers[timer].timer_group, sTimers[timer].timer_idx, 0x00000000ULL);
-        sTimers[timer].timer_enabled = false;
-        if (timer == TIMER_STOPWATCH) {
-            seconds = 0;
-            setDisplayTime(seconds);
-        }
+    timer_pause(sTimers[timer].timer_group, sTimers[timer].timer_idx);
+    timer_set_counter_value(sTimers[timer].timer_group, sTimers[timer].timer_idx, 0x00000000ULL);
+    sTimers[timer].timer_enabled = false;
+    if (timer == TIMER_STOPWATCH) {
+        seconds = 0;
+        ESP_LOGI(TAG,"set display time to 0 \n");
+        setDisplayTime(seconds);
     }
 }
 
