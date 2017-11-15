@@ -35,6 +35,7 @@ enum {
 void display_init();
 void display_start();
 void display_stop();
+void display_disable(uint8_t displayNum);
 void display_indicate_charge_only();
 void display_indicate_charging_only();
 void display_indicate_charging();
@@ -43,6 +44,7 @@ void display_backup();
 void display_restore();
 void display_seticon(int icon, bool on);
 void setDisplayNumber(uint8_t displayNum, int32_t value);
+void setDisplayNumberOff(uint8_t displayNum);
 void setDisplayTime(uint32_t seconds);
 void setBatteryLevel(int batteryLevel);
 void setWifiSound(int wifiSound, bool enable);

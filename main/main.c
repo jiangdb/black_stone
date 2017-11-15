@@ -31,7 +31,9 @@
 #define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
 #define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1z
 #define REPEAT_COUNT_CALIBRATION    6
-#define SLEEP_COUNT                 2
+#define SLEEP_COUNT                 3
+#define SCALE_UP_MAX_WEIGHT         10000   //1kg
+#define SCALE_DOWN_MAX_WEIGHT       20000   //2kg
 
 enum {
     WROK_STATUS_INIT,
@@ -252,7 +254,9 @@ static void handle_key_event(void *arg)
                 }
                 break;
             case WORK_STATUS_SHUTDOWN:
-                done = true;
+                if (keyEvent.key_value == KEY_UP) {
+                    done = true;
+                }
                 break;
             default:
                 break;
@@ -278,6 +282,8 @@ static int32_t getAdcValue(uint8_t scaleChannel)
 static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
 {
     int32_t weight = convert_weight(scaleChannel, adcValue, false);
+    uint8_t weight_unit = config_get_weight_unit();
+    int32_t rtn=0;
 
     //trace zero
     bool traced = zero_trace(scaleChannel, adcValue, weight, 100);
@@ -299,7 +305,7 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
             }
         }
         //return unlock value
-        return weight;
+        rtn = weight;
     }else{
         //locked, check if unlock
         if ((abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD)) {
@@ -307,8 +313,9 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
             lock_weight[scaleChannel] = weight;
         }
         //return locked value
-        return lock_weight[scaleChannel];
+        rtn = lock_weight[scaleChannel];
     }
+    return (weight_unit == WEIGHT_UNIT_G)?rtn:(rtn * 100 / 2835);
 }
 
 static bool detectDualScale()
@@ -320,6 +327,10 @@ static bool detectDualScale()
             || ((weightUnit == WEIGHT_UNIT_OZ) && (absWeight > DOUBLE_SCALE_THRESHOLD_OZ))) {
         display_seticon(ICON_ALL, true);
         return true;
+    }else{
+        //turn off display
+        display_seticon(ICON_ALL, false);
+        setDisplayNumberOff(DISPLAY_CHANNEL_UP);
     }
     return false;
 }
@@ -424,9 +435,8 @@ void app_main()
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
-            if (!dualScale) {
-                dualScale = detectDualScale();
-            }
+            //ESP_LOGI(TAG, "%d ----- %d", getAdcValue(SCALE_UP), getAdcValue(SCALE_DOWN));
+            dualScale = detectDualScale();
             int32_t upAdcValue = 0;
             if (dualScale) {
                 upAdcValue = getAdcValue(SCALE_UP);

@@ -256,10 +256,10 @@ static void setDisplayTimeOff()
     }
 }
 
-static void setDisplayNumberOff()
+void setDisplayNumberOff(uint8_t displayNum)
 {
-    int start = 1;
-    for (int i=0; i<DIGITAL_NUMBER*2; i++) {
+    int start = 1+DIGITAL_NUMBER*displayNum;
+    for (int i=0; i<DIGITAL_NUMBER; i++) {
         display_data[start+i] = 0;
     }
 }
@@ -499,12 +499,13 @@ static void display_loop()
             }
         }else if (sbAlarm == ALARM_NUMBER) {
             switch_beap_vibrate(true);
-            setDisplayNumberOff();
+            setDisplayNumberOff(DISPLAY_CHANNEL_UP);
+            setDisplayNumberOff(DISPLAY_CHANNEL_DOWN);
             spi_trassfer_display();
             vTaskDelay(50/portTICK_RATE_MS);
             switch_beap_vibrate(false);
-            setDisplayNumber(0, siWeights[0]);
-            setDisplayNumber(1, siWeights[1]);
+            setDisplayNumber(DISPLAY_CHANNEL_UP, siWeights[0]);
+            setDisplayNumber(DISPLAY_CHANNEL_DOWN, siWeights[1]);
             spi_trassfer_display();
             vTaskDelay(50/portTICK_RATE_MS);
             alarmCount++;
@@ -568,8 +569,8 @@ void display_start()
 {
     //reset display time
     setDisplayTime(0);
-    //setDisplayNumber(0,0);        //default single scale
-    setDisplayNumber(1,0);
+    //setDisplayNumber(DISPLAY_CHANNEL_UP,0);        //default single scale
+    setDisplayNumber(DISPLAY_CHANNEL_DOWN,0);
 
     if (config_get_alarm_enable()) {
         //setWifiSound(1,1);
