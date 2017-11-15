@@ -428,9 +428,12 @@ void app_main()
     }
 
     ESP_LOGD(TAG,"enter main loop!!!\n");
-    int32_t calibration_data[SCALE_NUM][CALIBRATION_NUMS] = {0};
-
     work_status = WORK_STATUS_NORMAL;
+
+    cal_set_zero(SCALE_UP, getAdcValue(SCALE_UP));
+    cal_set_zero(SCALE_DOWN, getAdcValue(SCALE_DOWN));
+
+    int32_t calibration_data[SCALE_NUM][CALIBRATION_NUMS] = {0};
     bool dualScale = false;
     while(!done) {
         vTaskDelay(100/portTICK_RATE_MS);
