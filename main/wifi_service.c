@@ -5,6 +5,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
@@ -12,20 +13,23 @@
 #include "esp_event_loop.h"
 #include "wifi_service.h"
 #include "gatts_service.h"
+#include "http_request.h"
 #include "display.h"
 #include "config.h"
 
 #define TAG "WIFI_SERVICE"
 
+#define CONNECTED_BIT       BIT0
+#define DISCONNECTED_BIT    BIT1
+#define RECONNECT_BIT       BIT2
+#define EVENT_GROUP  (CONNECTED_BIT | DISCONNECTED_BIT | RECONNECT_BIT)
+
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
-static const int CONNECTED_BIT = BIT0;
-static const int DISCONNECTED_BIT = BIT1;
-
 static uint8_t wifi_status = WIFI_STATUS_UNSTARTED;
 static TaskHandle_t xHandle = NULL;
-static SemaphoreHandle_t reconnectSem = NULL;
 
+void ws_task_loop();
 static void ws_start();
 
 esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
@@ -33,34 +37,26 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     switch(event->event_id) {
         case SYSTEM_EVENT_STA_START:
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_START");
+            wifi_event_group = xEventGroupCreate();
+            xTaskCreate(&ws_task_loop, "wifi_service_task_loop", 8192, NULL, 8, &xHandle);
             wifi_status = WIFI_STATUS_CONNECTING;
             ESP_ERROR_CHECK(esp_wifi_connect());
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
             ESP_LOGD(TAG, "SYSTEM_EVENT_STA_GOT_IP");
             ESP_LOGD(TAG, "got ip:%s\n",ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
-            if (wifi_status != WIFI_STATUS_CONNECTED) {
-                wifi_status = WIFI_STATUS_CONNECTED;
-                bt_notify_wifi_status(wifi_status);
-                display_seticon(ICON_WIFI, true);
-            }
+            xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             {
                 system_event_sta_disconnected_t *disconnected = &event->event_info.disconnected;
                 ESP_LOGD(TAG, "SYSTEM_EVENT_STA_DISCONNECTED, ssid:%s, ssid_len:%d, bssid:" MACSTR ", reason:%d", \
                        disconnected->ssid, disconnected->ssid_len, MAC2STR(disconnected->bssid), disconnected->reason);
-                if (wifi_status != WIFI_STATUS_DISCONNECTED) {
-                    wifi_status = WIFI_STATUS_DISCONNECTED;
-                    bt_notify_wifi_status(wifi_status);
-                    display_seticon(ICON_WIFI, false);
-                }
-                //manually disconnected, do reconnect immediately
                 if (disconnected->reason == WIFI_REASON_ASSOC_LEAVE) {
-                    wifi_status = WIFI_STATUS_CONNECTING;
-                    ESP_ERROR_CHECK(esp_wifi_connect());
+                    //manually disconnected, do reconnect immediately
+                    xEventGroupSetBits(wifi_event_group, RECONNECT_BIT);
                 }else{
-                    xSemaphoreGive(reconnectSem);
+                    xEventGroupSetBits(wifi_event_group, DISCONNECTED_BIT);
                 }
             }
             break;
@@ -70,16 +66,42 @@ esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
-void ws_connect_loop()
+void ws_task_loop()
 {
-    while(1) {
-        xSemaphoreTake( reconnectSem, portMAX_DELAY );
+    EventBits_t uxBits;
+    TickType_t tickToWait = portMAX_DELAY;
 
-        //reconnect every 30s
-        vTaskDelay(30000/portTICK_RATE_MS);
-        if (wifi_status == WIFI_STATUS_DISCONNECTED) {
+    while(1) {
+        uxBits = xEventGroupWaitBits(wifi_event_group, EVENT_GROUP, pdTRUE, pdFALSE, tickToWait); 
+        tickToWait = portMAX_DELAY;
+
+        ESP_LOGD(TAG, "get Event group %08x", uxBits);
+        if(uxBits & CONNECTED_BIT) {
+            ESP_LOGD(TAG, "CONNECTED_BIT");
+            wifi_status = WIFI_STATUS_CONNECTED;
+            display_seticon(ICON_WIFI, true);
+            bt_notify_wifi_status(wifi_status);
+            device_login();
+        } else if (uxBits & DISCONNECTED_BIT) {
+            ESP_LOGD(TAG, "DISCONNECTED_BIT");
+            wifi_status = WIFI_STATUS_DISCONNECTED;
+            display_seticon(ICON_WIFI, false);
+            bt_notify_wifi_status(wifi_status);
+            //reconnect every 30s
+            tickToWait = 30000/portTICK_RATE_MS;
+        } else if (uxBits & RECONNECT_BIT) {
+            ESP_LOGD(TAG, "RECONNECT_BIT");
+            wifi_status = WIFI_STATUS_DISCONNECTED;
+            display_seticon(ICON_WIFI, false);
+            bt_notify_wifi_status(wifi_status);
             wifi_status = WIFI_STATUS_CONNECTING;
             ESP_ERROR_CHECK(esp_wifi_connect());
+        } else {
+            ESP_LOGD(TAG, "TIMEOUT");
+            if (wifi_status == WIFI_STATUS_DISCONNECTED) {
+                wifi_status = WIFI_STATUS_CONNECTING;
+                ESP_ERROR_CHECK(esp_wifi_connect());
+            }
         }
     }
 }
@@ -175,7 +197,6 @@ void ws_stop()
 
 static void ws_start()
 {
-    ESP_LOGD(TAG, "%s", __func__);
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -185,18 +206,12 @@ static void ws_start()
     ESP_ERROR_CHECK( esp_wifi_set_ps(WIFI_PS_MODEM) );
     wifi_status = WIFI_STATUS_STARTING;
     ESP_ERROR_CHECK( esp_wifi_start() );
-
-    //Create re-connect task
-    reconnectSem=xSemaphoreCreateBinary();
-    xTaskCreate(&ws_connect_loop, "wifi_service_connect_loop", 2048, NULL, 8, &xHandle);
 }
 
 void ws_init()
 {
-    //char* ssid = config_get_wifi_name();
-    //char* pass = config_get_wifi_pass();
-    char* ssid = "8Sian-K";
-    char* pass = "8sianmedianetwork";
+    char* ssid = config_get_wifi_name();
+    char* pass = config_get_wifi_pass();
     if (!ws_valid_config(ssid, pass)) return;
 
     ws_start();
