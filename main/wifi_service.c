@@ -81,7 +81,6 @@ void ws_task_loop()
             wifi_status = WIFI_STATUS_CONNECTED;
             display_seticon(ICON_WIFI, true);
             bt_notify_wifi_status(wifi_status);
-            device_login();
         } else if (uxBits & DISCONNECTED_BIT) {
             ESP_LOGD(TAG, "DISCONNECTED_BIT");
             wifi_status = WIFI_STATUS_DISCONNECTED;
