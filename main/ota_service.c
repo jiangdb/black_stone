@@ -25,11 +25,11 @@
 #include "display.h"
 #include "ota_service.h"
 
+#define TAG "OTA"
+
 #define CONTENT_LENGTH      "Content-Length"
 #define BUFFSIZE            1024
 #define TEXT_BUFFSIZE       1024
-
-static const char *TAG = "OTA";
 
 /*an ota data write buffer ready to write to the flash*/
 static char ota_write_data[BUFFSIZE + 1] = { 0 };
