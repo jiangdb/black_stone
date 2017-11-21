@@ -26,7 +26,10 @@
 
 #define TAG "HTTP"
 
-#define HOST                    "bs.ziipoo.com.cn"
+#define IP_HOST                 "api.ipify.org"             //"ip.chinaz.com"
+#define IP_PATH                 "/"                         //"/getip.aspx"
+#define IP_PORT                 80
+#define HOST                    "bm.timemore.com"           //"bs.ziipoo.com.cn"
 #define PORT                    80
 #define API_DEVICE_ONLINE       "/api/v1/device/online"
 #define BUFFSIZE                1024
@@ -132,13 +135,13 @@ static bool recv_response(char* buf, int* len)
 static bool http_get_public_ip(char* ip, int* len) 
 {
     /*connect to http server*/
-    if (!connect_to_http_server("ip.chinaz.com", 80)) {
+    if (!connect_to_http_server(IP_HOST, IP_PORT)) {
         ESP_LOGE(TAG, "error connect to host");
         return false;
     }
 
     char http_request[256] = {0};
-    sprintf(http_request, HTTP_REQUEST_GET, "/getip.aspx", "ip.chinaz.com");
+    sprintf(http_request, HTTP_REQUEST_GET, IP_PATH, IP_HOST);
     if (!send_request(http_request, strlen(http_request))) {
         ESP_LOGE(TAG, "error send request");
         close(socket_id);
@@ -178,7 +181,7 @@ static bool http_put_device_online(char* ip)
     char response[20] = {0};
     int len = 20;
     if (recv_response(response, &len)) {
-        ESP_LOGD(TAG, "put device online: %s", response);
+        ESP_LOGD(TAG, "put device online");
         ret = true;
     }
     close(socket_id);
