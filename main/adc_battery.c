@@ -19,6 +19,7 @@
 #define BATTERY_PERCENTAGE_50       3800
 #define BATTERY_PERCENTAGE_25       3700
 #define BATTERY_PERCENTAGE_0        3500
+#define BATTERY_CHARGE_START        3600
 #define BATTERY_WARNING             3500
 #define BATTERY_SHUTDOWN            3400
 
@@ -86,6 +87,12 @@ uint8_t get_battery_level()
         return BATTERY_LEVEL_EMPTY;
     }
     return BATTERY_LEVEL_EMPTY;
+}
+
+bool can_start_up()
+{
+    int voltage = read_voltage();
+    return (voltage < BATTERY_CHARGE_START) ? false: true;
 }
 
 bool is_battery_extremely_low()

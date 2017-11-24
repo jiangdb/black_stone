@@ -27,7 +27,7 @@
 #define TAG  "MAIN"
 
 #define GPIO_LED_IO                 19
-#define DISPLAY_LOCK_THRESHOLD      5        //0.5g
+#define DISPLAY_LOCK_THRESHOLD      2        //0.2g
 #define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
 #define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1oz
 #define REPEAT_COUNT_CALIBRATION    7
@@ -170,7 +170,9 @@ static void handle_key_event(void *arg)
                     charging = false;
                 }else if (keyEvent.key_type == CLEAR_KEY) {
                     if (keyEvent.key_value == KEY_UP) {
-                        no_key_start = false;
+                        if (can_start_up()) {
+                            no_key_start = false;
+                        }
                     }
                 }
                 break;
