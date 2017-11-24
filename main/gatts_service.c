@@ -751,11 +751,11 @@ static void ble_notify_measurement()
         .reserved = 0,
     };
     buffer[0] = flag.val;
-    memcpy(&buffer[1], &weight_value[1], sizeof(int32_t));
+    memcpy(&buffer[1], &weight_value[DISPLAY_CHANNEL_DOWN], sizeof(int32_t));
 
-    if (weight_value[0] != -1) {
+    if (weight_value[DISPLAY_CHANNEL_UP] != -1) {
         flag.two_channel = 1;
-        memcpy(&buffer[5], &weight_value[0], sizeof(int32_t));
+        memcpy(&buffer[5], &weight_value[DISPLAY_CHANNEL_UP], sizeof(int32_t));
         bufferSize = sizeof(buffer);
     }
 
