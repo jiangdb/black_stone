@@ -406,6 +406,8 @@ void app_main()
     ESP_LOGI(TAG, "version: %s", FW_VERSION);
     ESP_LOGI(TAG, "model: %s", MODEL_NUMBER);
 
+    /* config */
+    config_init();
     //init battery first
     battery_init();
 
@@ -469,7 +471,7 @@ void app_main()
     gpio_key_start();
 
     /* config */
-    config_init();
+    config_load();
     calibration_init();
 
     /* Init weight unit LED */

@@ -20,6 +20,7 @@ typedef struct {
 }firmware_t;
 
 void config_init();
+void config_load();
 void config_close();
 
 int32_t config_read(char* name, int32_t default_value);

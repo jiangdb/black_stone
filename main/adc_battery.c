@@ -6,15 +6,19 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/adc.h"
 #include "battery.h"
 #include "display.h"
+#include "config.h"
 #include "key_event.h"
 #include "gatts_service.h"
 
+#define TAG  "BATTERY"
+
 #define ADC1_CHANNEL (6)
-#define ADC1_REF     3650
+#define CONFIG_ADC_REF              "adc_battery_ref"
 #define BATTERY_PERCENTAGE_75       3900
 #define BATTERY_PERCENTAGE_50       3800
 #define BATTERY_PERCENTAGE_25       3700
@@ -27,11 +31,12 @@ extern void handle_key_event(key_event_t keyEvent);
 
 static TaskHandle_t xHandle = NULL;
 static uint8_t batterLevel = 255;
+static uint32_t adc_ref = 3900;
 
 static int read_voltage()
 {
     int adcValue = adc1_get_voltage(ADC1_CHANNEL);
-    int voltage = (adcValue*ADC1_REF*2)/512;
+    int voltage = (adcValue * adc_ref * 2 ) / 512;
 
     // printf("The adc1 value:%d\n",adcValue);
     // printf("battery voltage:%d\n",(voltage+50)/100*100);
@@ -107,6 +112,14 @@ bool is_battery_level_low()
     return (voltage <= BATTERY_WARNING) ? true: false;
 }
 
+void battery_calibration()
+{
+    int adcValue = adc1_get_voltage(ADC1_CHANNEL);
+    adc_ref = 921600 / adcValue;
+    config_write(CONFIG_ADC_REF, adc_ref);
+    ESP_LOGD(TAG, "%s: adc_ref: %d",__func__, adc_ref);
+}
+
 void battery_start()
 {
     xTaskCreate(battery_task, "battery_task", 1024*3, NULL, 10, &xHandle);   
@@ -125,4 +138,6 @@ void battery_init()
     // initialize ADC
     adc1_config_width(ADC_WIDTH_9Bit);
     adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_11db);
+
+    adc_ref = config_read(CONFIG_ADC_REF, 3900);
 }

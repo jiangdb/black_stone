@@ -6,6 +6,7 @@
 void battery_init();
 void battery_start();
 void battery_stop();
+void battery_calibration();
 bool can_start_up();
 bool is_battery_level_low();
 bool is_battery_extremely_low();

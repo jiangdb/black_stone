@@ -79,6 +79,7 @@ enum {
     CONTROL_START_TIMER,
     CONTROL_PAUSE_TIMER,
     CONTROL_RESET_TIMER,
+    CONTROL_BATTERY_CALIBRATION,
 };
 
 enum
@@ -556,6 +557,9 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 keyEvent.key_value = KEY_HOLD;
                 send_key_event(keyEvent,false);
             }
+            break;
+        case CONTROL_BATTERY_CALIBRATION:
+            battery_calibration();
             break;
         default:
             ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])
