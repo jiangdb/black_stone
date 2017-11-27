@@ -114,8 +114,14 @@ bool is_battery_level_low()
 
 void battery_calibration()
 {
-    int adcValue = adc1_get_voltage(ADC1_CHANNEL);
-    adc_ref = 921600 / adcValue;
+    int adc_sum = 0;
+    for(int i=0; i<10; i++) {
+        adc_sum += adc1_get_voltage(ADC1_CHANNEL);
+        vTaskDelay(1/portTICK_PERIOD_MS);
+    }
+    int adc_mean = adc_sum/10;
+    //921600 == 1800*512
+    adc_ref = 921600 / adc_mean;
     config_write(CONFIG_ADC_REF, adc_ref);
     ESP_LOGD(TAG, "%s: adc_ref: %d",__func__, adc_ref);
 }
@@ -140,4 +146,5 @@ void battery_init()
     adc1_config_channel_atten(ADC1_CHANNEL,ADC_ATTEN_11db);
 
     adc_ref = config_read(CONFIG_ADC_REF, 3900);
+    ESP_LOGD(TAG, "%s: read adc_ref: %d",__func__, adc_ref);
 }
