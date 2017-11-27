@@ -38,8 +38,8 @@ static int read_voltage()
     int adcValue = adc1_get_voltage(ADC1_CHANNEL);
     int voltage = (adcValue * adc_ref * 2 ) / 512;
 
-    // printf("The adc1 value:%d\n",adcValue);
-    // printf("battery voltage:%d\n",(voltage+50)/100*100);
+    //ESP_LOGD(TAG, "The adc1 value:%d\n",adcValue");
+    //ESP_LOGD(TAG, "battery voltage:%d\n",(voltage+50)/100*100);
 
     return (voltage+50)/100*100;
 }
