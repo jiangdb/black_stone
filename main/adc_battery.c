@@ -23,7 +23,7 @@
 #define BATTERY_PERCENTAGE_50       3800
 #define BATTERY_PERCENTAGE_25       3700
 #define BATTERY_PERCENTAGE_0        3500
-#define BATTERY_CHARGE_START        3800
+#define BATTERY_CHARGE_START        3900
 #define BATTERY_WARNING             3500
 #define BATTERY_SHUTDOWN            3400
 
