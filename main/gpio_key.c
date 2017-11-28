@@ -72,6 +72,7 @@ static void gpio_key_task(void* arg)
     int tick[2]= {-1, -1};
     TickType_t tick_type = portMAX_DELAY;
 
+    key_event_t keyEvent;
     while(1) {
         if(xQueueReceive(gpio_evt_queue, &io_num, tick_type)) {
             int val = gpio_get_level(io_num);
@@ -81,7 +82,8 @@ static void gpio_key_task(void* arg)
                 int state1 = gpio_get_level(GPIO_INPUT_IO_STATE1);
                 int state2 = gpio_get_level(GPIO_INPUT_IO_STATE2);
 
-                key_event_t keyEvent;
+                keyEvent.key_type = KEY_TYPE_MAX;
+                keyEvent.key_value = KEY_VALUE_MAX;
                 if (state1 && state2) {
                     keyEvent.key_type = CHARGE_KEY;
                     send_key_event(keyEvent, false);
@@ -107,7 +109,7 @@ static void gpio_key_task(void* arg)
                 }
 
                 // detect key
-                key_event_t keyEvent;
+                keyEvent.key_type = KEY_TYPE_MAX;
                 keyEvent.key_value = val==1?KEY_DOWN:KEY_UP;
                 if (io_num == GPIO_INPUT_IO_KEY_LEFT) {
                     keyEvent.key_type = TIMER_KEY;
@@ -133,7 +135,6 @@ static void gpio_key_task(void* arg)
                 tick[i]++;
                 if (tick[i] > 10) {
                     //50*10 ms
-                    key_event_t keyEvent;
                     keyEvent.key_value = KEY_HOLD;
                     keyEvent.key_type = (i==0?TIMER_KEY:CLEAR_KEY);
                     send_key_event(keyEvent, false);
