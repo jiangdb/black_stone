@@ -190,7 +190,7 @@ static bool http_put_device_online(char* ip)
 
 void device_online()
 {
-    ESP_LOGI(TAG, "device online");
+    ESP_LOGD(TAG, "device online");
 
     char ip[128] = {0};
     int len = 0;
