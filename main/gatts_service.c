@@ -190,7 +190,9 @@ typedef union {
 
 static int32_t weight_value[2] = {-1,0};
 static TaskHandle_t xHandle = NULL;
-static SemaphoreHandle_t connectedSem = NULL;
+//static SemaphoreHandle_t connectedSem = NULL;
+static bool meas_notify_enable = false;
+static bool control_notify_enable = false;
 
 /*
  *  Weight Scale PROFILE ATTRIBUTES
@@ -608,7 +610,24 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
                     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, NULL);
                     handle_weight_control_write(gatts_if, param);
                 }
+            } else if (param->write.handle == weight_scale_handle_table[WSS_IDX_WS_MEAS_NTF_CFG]) {
+                uint8_t* value = (uint8_t *)param->write.value;
+                ESP_LOGD(GATTS_SERVICE_TAG, "turn on/off measurement notify: %08x", *value);
+                if (value[0] & 0x01) {
+                    meas_notify_enable = true;
+                }else{
+                    meas_notify_enable = false;
+                }
+            } else if (param->write.handle == weight_scale_handle_table[WSS_IDX_WS_CTNL_NTF_CFG]) {
+                uint8_t* value = (uint8_t *)param->write.value;
+                ESP_LOGD(GATTS_SERVICE_TAG, "turn on/off control notify: %08x", *value);
+                if (value[0] & 0x01) {
+                    control_notify_enable = true;
+                }else{
+                    control_notify_enable = false;
+                }
             }
+
             break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             break;
@@ -625,24 +644,23 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
         case ESP_GATTS_STOP_EVT:
             break;
         case ESP_GATTS_CONNECT_EVT: {
-            esp_ble_conn_update_params_t conn_params = {0};
-            memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
-            /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
-            conn_params.latency = 0;
-            conn_params.max_int = 0x50;    // max_int = 0x50*1.25ms = 100ms
-            conn_params.min_int = 0x30;    // min_int = 0x30*1.25ms = 60ms
-            conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
-            ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",
-                     param->connect.conn_id,
-                     param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
-                     param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5],
-                     param->connect.is_connected);
-            weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].conn_id = param->connect.conn_id;
-            weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected = true;
-            //start sent the update connection parameters to the peer device.
-            esp_ble_gap_update_conn_params(&conn_params);
-
-            xSemaphoreGive(connectedSem);
+                esp_ble_conn_update_params_t conn_params = {0};
+                memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+                /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
+                conn_params.latency = 0;
+                conn_params.max_int = 0x50;    // max_int = 0x50*1.25ms = 100ms
+                conn_params.min_int = 0x30;    // min_int = 0x30*1.25ms = 60ms
+                conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
+                ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",
+                         param->connect.conn_id,
+                         param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
+                         param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5],
+                         param->connect.is_connected);
+                weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].conn_id = param->connect.conn_id;
+                weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected = true;
+                //start sent the update connection parameters to the peer device.
+                esp_ble_gap_update_conn_params(&conn_params);
+                //xSemaphoreGive(connectedSem);
             }
             break;
         case ESP_GATTS_DISCONNECT_EVT:
@@ -714,9 +732,9 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 static void notify_control_point(uint8_t key, uint8_t value)
 {
-    ESP_LOGD(GATTS_SERVICE_TAG, "%s(%d, %d)", __func__, key, value);
-    if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) return;
+    if (!control_notify_enable) return;
 
+    ESP_LOGD(GATTS_SERVICE_TAG, "%s(%d, %d)", __func__, key, value);
     uint8_t notify[4];
     memset(notify, 0, sizeof(notify));
 
@@ -773,11 +791,14 @@ static void ble_notify_measurement()
 void weight_measurement_indicate_loop()
 {
     while(1) {
+        /*
         if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) {
             xSemaphoreTake( connectedSem, portMAX_DELAY );
         }
-
-        ble_notify_measurement();
+        */
+        if ( meas_notify_enable ) {
+            ble_notify_measurement();
+        }
         vTaskDelay(100/portTICK_RATE_MS);
     }
 }
@@ -836,7 +857,7 @@ void bt_init()
     esp_ble_gap_register_callback(gap_event_handler);
     esp_ble_gatts_app_register(WEIGHT_SCALE_APP_ID);
 
-    connectedSem=xSemaphoreCreateBinary();
+    //connectedSem=xSemaphoreCreateBinary();
     //Create task
     xTaskCreate(&weight_measurement_indicate_loop, "weight_mesa_indicate_task", 2048, NULL, 5, &xHandle);
     return;
