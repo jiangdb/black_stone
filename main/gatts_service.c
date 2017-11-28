@@ -190,8 +190,8 @@ typedef union {
 
 static int32_t weight_value[2] = {-1,0};
 static TaskHandle_t xHandle = NULL;
-//static SemaphoreHandle_t connectedSem = NULL;
-static bool meas_notify_enable = false;
+static SemaphoreHandle_t connectedSem = NULL;
+static bool meas_indicate_enable = false;
 static bool control_notify_enable = false;
 
 /*
@@ -519,6 +519,7 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
                 char* wifi_name = config_get_wifi_name();
                 char* wifi_pass = config_get_wifi_pass();
+                ESP_LOGD(GATTS_SERVICE_TAG, "control wifi: %s--%s", wifi_name, wifi_pass);
                 ws_connect(wifi_name, wifi_pass);
             }
             break;
@@ -613,10 +614,10 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
             } else if (param->write.handle == weight_scale_handle_table[WSS_IDX_WS_MEAS_NTF_CFG]) {
                 uint8_t* value = (uint8_t *)param->write.value;
                 ESP_LOGD(GATTS_SERVICE_TAG, "turn on/off measurement notify: %08x", *value);
-                if (value[0] & 0x01) {
-                    meas_notify_enable = true;
+                if (value[0] & 0x02) {
+                    meas_indicate_enable = true;
                 }else{
-                    meas_notify_enable = false;
+                    meas_indicate_enable = false;
                 }
             } else if (param->write.handle == weight_scale_handle_table[WSS_IDX_WS_CTNL_NTF_CFG]) {
                 uint8_t* value = (uint8_t *)param->write.value;
@@ -660,7 +661,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
                 weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected = true;
                 //start sent the update connection parameters to the peer device.
                 esp_ble_gap_update_conn_params(&conn_params);
-                //xSemaphoreGive(connectedSem);
+                xSemaphoreGive(connectedSem);
             }
             break;
         case ESP_GATTS_DISCONNECT_EVT:
@@ -702,7 +703,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
 static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, 
                                     esp_ble_gatts_cb_param_t *param)
 {
-    ESP_LOGD(GATTS_SERVICE_TAG, "GATTS_EVT %d, gatts if %d", event, gatts_if);
+    //ESP_LOGD(GATTS_SERVICE_TAG, "GATTS_EVT %d, gatts if %d", event, gatts_if);
 
     /* If event is register event, store the gatts_if for each profile */
     if (event == ESP_GATTS_REG_EVT) {
@@ -732,7 +733,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 static void notify_control_point(uint8_t key, uint8_t value)
 {
-    if (!control_notify_enable) return;
+    if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected || !control_notify_enable) return;
 
     ESP_LOGD(GATTS_SERVICE_TAG, "%s(%d, %d)", __func__, key, value);
     uint8_t notify[4];
@@ -759,7 +760,7 @@ void bt_notify_battery_level(uint8_t level)
     notify_control_point(CONTROL_NOTIFY_BATTERY, level);
 }
 
-static void ble_notify_measurement()
+static void ble_indicate_measurement()
 {
     //ESP_LOGI(GATTS_SERVICE_TAG, "%s()", __func__);
     uint8_t buffer[9];
@@ -791,13 +792,12 @@ static void ble_notify_measurement()
 void weight_measurement_indicate_loop()
 {
     while(1) {
-        /*
         if (!weight_scale_profile_tab[WEIGHT_SCALE_PROFILE_APP_IDX].connected) {
             xSemaphoreTake( connectedSem, portMAX_DELAY );
         }
-        */
-        if ( meas_notify_enable ) {
-            ble_notify_measurement();
+
+        if ( meas_indicate_enable ) {
+            ble_indicate_measurement();
         }
         vTaskDelay(100/portTICK_RATE_MS);
     }
@@ -857,7 +857,7 @@ void bt_init()
     esp_ble_gap_register_callback(gap_event_handler);
     esp_ble_gatts_app_register(WEIGHT_SCALE_APP_ID);
 
-    //connectedSem=xSemaphoreCreateBinary();
+    connectedSem=xSemaphoreCreateBinary();
     //Create task
     xTaskCreate(&weight_measurement_indicate_loop, "weight_mesa_indicate_task", 2048, NULL, 5, &xHandle);
     return;
