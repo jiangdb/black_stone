@@ -166,6 +166,7 @@ void ws_connect(char* ssid, char* pass)
         case WIFI_STATUS_DISCONNECTED:
             ws_config(ssid, pass);
             wifi_status = WIFI_STATUS_CONNECTING;
+            bt_notify_wifi_status(wifi_status);
             ESP_ERROR_CHECK(esp_wifi_connect());
             break;
         case WIFI_STATUS_CONNECTING:
