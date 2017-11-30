@@ -541,7 +541,7 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
             if (!bs_timer_status(TIMER_STOPWATCH)) {
                 key_event_t keyEvent;
                 keyEvent.key_type = TIMER_KEY;
-                keyEvent.key_value = KEY_DOWN;
+                keyEvent.key_value = KEY_UP;
                 send_key_event(keyEvent,false);
             }
             break;
@@ -549,7 +549,7 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
             if (bs_timer_status(TIMER_STOPWATCH)) {
                 key_event_t keyEvent;
                 keyEvent.key_type = TIMER_KEY;
-                keyEvent.key_value = KEY_DOWN;
+                keyEvent.key_value = KEY_UP;
                 send_key_event(keyEvent,false);
             }
             break;
@@ -558,6 +558,9 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 key_event_t keyEvent;
                 keyEvent.key_type = TIMER_KEY;
                 keyEvent.key_value = KEY_HOLD;
+                send_key_event(keyEvent,false);
+                keyEvent.key_type = TIMER_KEY;
+                keyEvent.key_value = KEY_UP;
                 send_key_event(keyEvent,false);
             }
             break;
@@ -778,6 +781,7 @@ static void ble_indicate_measurement()
 
     if (weight_value[DISPLAY_CHANNEL_UP] != -1) {
         flag.two_channel = 1;
+        buffer[0] = flag.val;
         memcpy(&buffer[5], &weight_value[DISPLAY_CHANNEL_UP], sizeof(int32_t));
         bufferSize = sizeof(buffer);
     }
