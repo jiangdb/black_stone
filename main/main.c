@@ -523,12 +523,12 @@ void app_main()
                 if (dualScale) {
                     cal_set_zero(SCALE_UP, upAdcValue);
                     setDisplayNumber(DISPLAY_CHANNEL_UP, 0);
-                    bt_set_weight(0, 0);
+                    bt_set_weight(DISPLAY_CHANNEL_UP, 0);
                     lock_weight[SCALE_UP] = 0;
                 }
                 cal_set_zero(SCALE_DOWN, downAdcValue);
                 setDisplayNumber(DISPLAY_CHANNEL_DOWN, 0);
-                bt_set_weight(1, 0);
+                bt_set_weight(DISPLAY_CHANNEL_UP, 0);
                 lock_weight[SCALE_DOWN] = 0;
                 set_zero_count = -1;
                 continue;
