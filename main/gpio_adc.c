@@ -22,7 +22,7 @@
 */
 #define TAG                   "GPIO_ADC"
 
-#define PRECISION             6
+#define PRECISION             4
 
 #define PIN_NUM_DATA          4
 #define PIN_NUM_CLK           0
@@ -201,10 +201,10 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_GpioAdcData, value);
     value = queue_get_value(&qb_GpioAdcData, ALG_MEDIAN_VALUE);
 #endif
-    //if (abs(gpio_adc_value - value) >=2 ) {
+    if (abs(gpio_adc_value - value) > 3 ) {
         gpio_adc_value = value;
         //printf("gpio_adc_value: %d\n", gpio_adc_value);
-    //}
+    }
 }
 
 static void gpio_adc_loop()

@@ -23,7 +23,7 @@
 */
 #define TAG                   "SPI-ADC"
 
-#define PRECISION             6
+#define PRECISION             4
 
 #define PIN_NUM_DATA          23
 #define PIN_NUM_CLK           18
@@ -179,10 +179,10 @@ static void push_to_buffer(int32_t value)
     queue_buffer_push(&qb_SpiAdcData, value);
     value = queue_get_value(&qb_SpiAdcData, ALG_MEDIAN_VALUE);
 #endif
-    //if (abs(spi_adc_value - value) >=2 ) {
+    if (abs(spi_adc_value - value) > 3 ) {
         spi_adc_value = value;
         //ESP_LOGD(TAG,"spi_adc_value: %d\n", spi_adc_value);
-    //}
+    }
 }
 
 static void spi_init()
