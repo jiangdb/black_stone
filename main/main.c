@@ -64,7 +64,7 @@ enum {
 
 static int calibrate_tick = -1;
 static int calibrate_step = 0;
-static bool display_lock[2] = {false, false};
+static bool display_lock[2] = {true, true};
 static int display_lock_count[2] = {0,0};
 static int set_zero_count = -1;
 static int32_t lock_weight[2] = {0,0};
