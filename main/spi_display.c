@@ -248,7 +248,7 @@ void setDisplayTime(uint32_t seconds)
 
     if (config_get_alarm_enable() == 1) {
         uint16_t alarmSeconds = config_get_alarm_time(); 
-        if (seconds >= alarmSeconds && seconds > 0) {
+        if (seconds == alarmSeconds && seconds > 0) {
             sbAlarm = ALARM_TIME;
         }
     }
