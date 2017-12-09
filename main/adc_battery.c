@@ -20,12 +20,12 @@
 #define ADC1_CHANNEL (6)
 #define CONFIG_ADC_REF              "adc_battery_ref"
 #define BATTERY_PERCENTAGE_75       3900
-#define BATTERY_PERCENTAGE_50       3800
-#define BATTERY_PERCENTAGE_25       3700
-#define BATTERY_PERCENTAGE_0        3500
+#define BATTERY_PERCENTAGE_50       3700
+#define BATTERY_PERCENTAGE_25       3500
+#define BATTERY_PERCENTAGE_0        3400
 #define BATTERY_CHARGE_START        3750
-#define BATTERY_WARNING             3500
-#define BATTERY_SHUTDOWN            3400
+#define BATTERY_WARNING             3300
+#define BATTERY_SHUTDOWN            3200
 
 extern void handle_key_event(key_event_t keyEvent);
 
