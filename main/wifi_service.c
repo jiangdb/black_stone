@@ -95,6 +95,7 @@ void ws_task_loop()
             display_seticon(ICON_WIFI, false);
             bt_notify_wifi_status(wifi_status);
             wifi_status = WIFI_STATUS_CONNECTING;
+            bt_notify_wifi_status(wifi_status);
             ESP_ERROR_CHECK(esp_wifi_connect());
         } else {
             ESP_LOGD(TAG, "TIMEOUT");
