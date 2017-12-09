@@ -131,7 +131,7 @@ bool config_set_alarm_time(uint16_t timeInSeconds)
 uint16_t config_get_alarm_weight()
 {
     //should be consistant with unit;
-    return system_settings.alarm_weight * 10;
+    return system_settings.alarm_weight;
 }
 
 bool config_set_alarm_weight(uint16_t weight)
