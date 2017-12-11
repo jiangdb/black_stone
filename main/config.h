@@ -22,6 +22,7 @@ typedef struct {
 void config_init();
 void config_load();
 void config_close();
+void config_reset();
 
 int32_t config_read(char* name, int32_t default_value);
 bool config_write(char* name, int32_t value);
@@ -52,5 +53,8 @@ bool config_set_wifi_pass(char* pass, size_t len);
 
 firmware_t* config_get_firmware_upgrade();
 bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, char* path, uint8_t path_len);
+
+char* config_get_device_name();
+bool config_set_device_name(char* name, size_t len);
 
 #endif  /*_BS_CONFIG_H_*/

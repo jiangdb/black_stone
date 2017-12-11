@@ -31,6 +31,7 @@
 #define KEY_WEIGHT_UNIT         "weight unit"
 #define KEY_WIFI_NAME           "wifi name"
 #define KEY_WIFI_PASS           "wifi pass"
+#define KEY_DEVICE_NAME         "device name"
 
 typedef struct {
     uint8_t zero_trace;
@@ -41,6 +42,7 @@ typedef struct {
     uint8_t weight_unit;
     char* wifi_name;
     char* wifi_pass;
+    char* device_name;
     firmware_t firmware;
 }system_settings_t;
 
@@ -220,12 +222,82 @@ bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, cha
     return true;
 }
 
+char* config_get_device_name()
+{
+    return system_settings.device_name;
+}
+
+bool config_set_device_name(char* name, size_t len)
+{
+    free(system_settings.device_name);
+    system_settings.device_name = malloc(len+1);
+    memset(system_settings.device_name, 0, len+1);      //make sure end up with 0
+    memcpy(system_settings.device_name, name, len);
+    ESP_LOGD(TAG, "%s: %s\n", __func__, system_settings.device_name);
+    esp_err_t err = nvs_set_str(config_handle, KEY_DEVICE_NAME, system_settings.device_name);
+    return err == ESP_OK;
+}
+
 void config_close()
 {
     free(system_settings.wifi_name);
     free(system_settings.wifi_pass);
     nvs_commit(config_handle);
     nvs_close(config_handle);
+}
+
+void config_reset()
+{
+    esp_err_t err; 
+
+    ESP_LOGI(TAG, "%s\n", __func__);
+
+    //zero trace enable
+    system_settings.zero_trace = 0;
+    err = nvs_erase_key(config_handle, KEY_ZERO_TRACE);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //alarm enable
+    system_settings.alarm_enable = 0;
+    err = nvs_erase_key(config_handle, KEY_ALARM_ENABLE);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //alarm time in seconds
+    system_settings.alarm_time = 0;
+    err = nvs_erase_key(config_handle, KEY_ALARM_TIME);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //alarm weight
+    system_settings.alarm_weight = 0;
+    err = nvs_erase_key(config_handle, KEY_ALARM_WEIGHT);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //alarm weight uint
+    system_settings.alarm_weight_unit = 0;
+    err = nvs_erase_key(config_handle, KEY_ALARM_WEIGHT_UNIT);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //weight uint
+    system_settings.weight_unit = 0;
+    err = nvs_erase_key(config_handle, KEY_WEIGHT_UNIT);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //wifi name
+    free(system_settings.wifi_name);
+    system_settings.wifi_name = NULL;
+    err = nvs_erase_key(config_handle, KEY_WIFI_NAME);
+    
+    //wifi pass
+    free(system_settings.wifi_pass);
+    system_settings.wifi_pass = NULL;
+    err = nvs_erase_key(config_handle, KEY_WIFI_PASS);
+
+    //device name
+    free(system_settings.device_name);
+    system_settings.device_name = NULL;
+    err = nvs_erase_key(config_handle, KEY_DEVICE_NAME);
+
+    nvs_commit(config_handle);
 }
 
 void config_load()
@@ -294,7 +366,20 @@ void config_load()
         ESP_LOGI(TAG, "%s: wifi_pass: %s\n", __func__, system_settings.wifi_pass);
     }else{
         system_settings.wifi_pass = NULL;
-        ESP_LOGI(TAG, "%s: wifi_pass is empty\n", __func__);
+        ESP_LOGI(TAG, "%s: wifi_pass is empty", __func__);
+    }
+
+    //device name
+    required_size = 0;
+    err = nvs_get_str(config_handle, KEY_DEVICE_NAME, NULL, &required_size);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+    if (err == ESP_OK) {
+        system_settings.device_name = malloc(required_size);
+        nvs_get_str(config_handle, KEY_DEVICE_NAME, system_settings.device_name, &required_size);
+        ESP_LOGI(TAG, "%s: device_name: %s", __func__, system_settings.device_name);
+    }else{
+        system_settings.device_name = NULL;
+        ESP_LOGI(TAG, "%s: device_name is empty\n", __func__);
     }
 }
 

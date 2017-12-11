@@ -80,6 +80,8 @@ enum {
     CONTROL_PAUSE_TIMER,
     CONTROL_RESET_TIMER,
     CONTROL_BATTERY_CALIBRATION,
+    CONTROL_DEVICE_NAME,
+    CONTROL_FACTORY_RESET,
 };
 
 enum
@@ -468,13 +470,14 @@ static void init_weight_control_value(uint8_t* value, uint16_t* len)
 static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
     //prepare response
-    uint8_t reply[2];
+    uint8_t reply[3];
     memset(reply, 0, sizeof(reply));
     reply[0] = CONTROL_OPT_WRITE;
     reply[1] = CONTROL_STATUS_SUCCESS;
 
     uint8_t *pData = (uint8_t *)param->write.value;
     ESP_LOGD(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control %d", pData[0]);
+    reply[2] = pData[0];
     switch(pData[0]) {
         case CONTROL_SET_ZERO:
             {
@@ -519,8 +522,13 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
                 char* wifi_name = config_get_wifi_name();
                 char* wifi_pass = config_get_wifi_pass();
-                ESP_LOGD(GATTS_SERVICE_TAG, "control wifi: %s--%s", wifi_name, wifi_pass);
                 ws_connect(wifi_name, wifi_pass);
+            }
+            break;
+        case CONTROL_DEVICE_NAME:
+            {
+                uint8_t name_len = pData[1];
+                config_set_device_name((char*)&pData[2],name_len);
             }
             break;
         case CONTROL_FW_UPGRADE:
@@ -567,6 +575,9 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
         case CONTROL_BATTERY_CALIBRATION:
             battery_calibration();
             break;
+        case CONTROL_FACTORY_RESET:
+            config_reset();
+            break;
         default:
             ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])
             reply[1] = CONTROL_STATUS_FAIL;
@@ -583,12 +594,18 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
     //ESP_LOGE(GATTS_SERVICE_TAG, "PROFILE event = %x\n",event);
     switch (event) {
         case ESP_GATTS_REG_EVT:
-            esp_ble_gap_set_device_name(DEVICE_NAME);
-            esp_ble_gap_config_adv_data(&weight_scale_adv_config);
-            esp_ble_gatts_create_attr_tab(weight_scale_gatt_db, gatts_if, 
-                                    WSS_IDX_NB, WEIGHT_SCALE_SVC_INST_ID);
-            esp_ble_gatts_create_attr_tab(device_information_gatt_db, gatts_if, 
-                                    DIS_IDX_NB, DEVICE_INFORMATION_SVC_INST_ID);
+            {
+                char* device_name = config_get_device_name();
+                if (device_name == NULL) {
+                    device_name = DEVICE_NAME;
+                }
+                esp_ble_gap_set_device_name(device_name);
+                esp_ble_gap_config_adv_data(&weight_scale_adv_config);
+                esp_ble_gatts_create_attr_tab(weight_scale_gatt_db, gatts_if, 
+                                        WSS_IDX_NB, WEIGHT_SCALE_SVC_INST_ID);
+                esp_ble_gatts_create_attr_tab(device_information_gatt_db, gatts_if, 
+                                        DIS_IDX_NB, DEVICE_INFORMATION_SVC_INST_ID);
+            }
             break;
         case ESP_GATTS_READ_EVT:
             ESP_LOGD(GATTS_SERVICE_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d", param->read.conn_id, param->read.trans_id, param->read.handle);
