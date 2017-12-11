@@ -62,7 +62,7 @@ static bool parse_header(char* header)
             size[j++] = header[i++];
         }
         binary_file_total_length = atoi(size);
-        ESP_LOGI(TAG, "CONTENT_LENGTH %d", binary_file_total_length);
+        ESP_LOGD(TAG, "CONTENT_LENGTH %d", binary_file_total_length);
         return true;
     }
     return false;
@@ -164,7 +164,7 @@ bool ota_task(firmware_t* firmware)
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
 
-    ESP_LOGI(TAG, "Starting OTA ...");
+    ESP_LOGD(TAG, "Starting OTA ...");
     assert(configured == running); /* fresh from reset, should be running from configured boot partition */
     ESP_LOGD(TAG, "Running partition type %d subtype %d (offset 0x%08x)",
              configured->type, configured->subtype, configured->address);
@@ -250,7 +250,7 @@ bool ota_task(firmware_t* firmware)
         }
     }
 
-    ESP_LOGI(TAG, "Total Write binary data length : %d", binary_file_length);
+    ESP_LOGD(TAG, "Total Write binary data length : %d", binary_file_length);
     display_setOperation(OPERATION_UPGRADE, 255, 1, 0, 0);
 
     if (esp_ota_end(update_handle) != ESP_OK) {
