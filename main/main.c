@@ -33,6 +33,7 @@
 #define REPEAT_COUNT_CALIBRATION    7
 #define SLEEP_COUNT                 3
 #define SET_ZERO_COUNT              5       //500ms
+#define FORCE_RESTART_COUNT         20     //10s
 #define SCALE_UP_MAX_WEIGHT_G       10000   //1kg
 #define SCALE_UP_MAX_WEIGHT_OZ      352     //35.2oz
 #define SCALE_DOWN_MAX_WEIGHT_G     20000   //2kg
@@ -71,13 +72,14 @@ static int32_t lock_weight[2] = {0,0};
 static bool done = false;
 static bool auto_shutdown = false;
 static int trigger_sleep_count = 0;
+static int force_restart_count = 0;
 static int cal_key_repeat_count = -1;
 static int work_status = WROK_STATUS_INIT;
 static bool charging = true;
 static bool no_key_start = true;
 static bool alarmed = false;
 static xQueueHandle eventQueue;
-static TaskHandle_t xHandle = NULL;
+static TaskHandle_t xKeyTaskHandler = NULL;
 
 static void led_init()
 {
@@ -163,6 +165,18 @@ static void handle_key_event(void *arg)
         ESP_LOGD(TAG,"%s: handle key evnet(%d, %d) work_status: %d!!!\n", TAG, keyEvent.key_type, keyEvent.key_value, work_status);
         //reset timeout timer
         bs_timer_reset(TIMER_TIMEOUT);
+
+        //force restart count
+        if (keyEvent.key_type == CLEAR_KEY && keyEvent.key_value == KEY_HOLD) {
+            force_restart_count++;
+            if (force_restart_count >= FORCE_RESTART_COUNT) {
+                ESP_LOGI(TAG, "force restart");
+                esp_restart();
+            }
+        }else{
+            force_restart_count = 0;
+        }
+        
         //handle key event
         switch(work_status) {
             case WORK_STATUS_CHARGING_SLEEP:
@@ -413,7 +427,7 @@ void app_main()
 
     /* start event queue */
     eventQueue = xQueueCreate(10, sizeof(key_event_t));
-    xTaskCreate(&handle_key_event, "key_event_task", 4096, NULL, 2, &xHandle);
+    xTaskCreate(&handle_key_event, "key_event_task", 4096, NULL, 2, &xKeyTaskHandler);
 
     /* Initialise key */
     gpio_key_init();
@@ -628,7 +642,7 @@ void app_main()
         vTaskDelay(100/portTICK_RATE_MS);
     }
     gpio_key_stop();
-    if( xHandle != NULL ) vTaskDelete( xHandle );
+    if( xKeyTaskHandler != NULL ) vTaskDelete( xKeyTaskHandler );
     battery_stop();
     if (is_charging()) {
         esp_restart();
