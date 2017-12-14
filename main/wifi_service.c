@@ -194,7 +194,9 @@ void ws_stop()
     {
         vTaskDelete( xHandle );
     }
-    esp_wifi_stop();
+    if (wifi_status != WIFI_STATUS_UNSTARTED) {
+        esp_wifi_stop();
+    }
 }
 
 static void ws_start()
