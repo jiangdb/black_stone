@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define MANUFACTURER            "Timemore" 
+#define MANUFACTURER            "Timemore"
 #define FW_VERSION              "0.80.09"
 //#define MODEL_NUMBER            "TES03PL"       //single scale
 #define MODEL_NUMBER            "TES04PL"       //double scale

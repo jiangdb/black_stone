@@ -225,8 +225,9 @@ static const uint16_t weight_scale_feature_uuid = CHAR_UUID_WEIGHT_SCALE_FEATURE
 static const uint32_t weight_scale_feature_val = 0x38;
 
 /// Weight Scale Service - Custom: Weight Scale Control Point characteristic, write&read
-//custom 128bit UUID 0x00001234800000000000000000000000
-static const uint8_t weight_scale_ctrl_point_uuid[16] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x08,0x34,0x12,0x00,0x00};
+//custom 128bit UUID 553f4e49-bf21-4468-9c6c-0e4fb5b17697
+static const uint8_t weight_scale_ctrl_point_uuid[16] = {0x97,0x76,0xb1,0xb5,0x4f,0x0e,0x6c,0x9c,0x68,0x44,0x21,0xbf,0x49,0x4e,0x3f,0x55};
+
 static const uint8_t weight_scale_ctrl_point_ccc[2] = {0x00, 0x00};
 
 static const uint16_t manufacturer_name_uuid = ESP_GATT_UUID_MANU_NAME;
@@ -669,8 +670,8 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
                 memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
                 /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
                 conn_params.latency = 0;
-                conn_params.max_int = 0x50;    // max_int = 0x50*1.25ms = 100ms
-                conn_params.min_int = 0x30;    // min_int = 0x30*1.25ms = 60ms
+                conn_params.max_int = 0x20;    // max_int = 0x50*1.25ms = 100ms
+                conn_params.min_int = 0x10;    // min_int = 0x30*1.25ms = 60ms
                 conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
                 ESP_LOGD(GATTS_SERVICE_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",
                          param->connect.conn_id,
