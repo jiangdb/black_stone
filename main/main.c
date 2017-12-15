@@ -542,7 +542,7 @@ void app_main()
                 }
                 cal_set_zero(SCALE_DOWN, downAdcValue);
                 setDisplayNumber(DISPLAY_CHANNEL_DOWN, 0);
-                bt_set_weight(DISPLAY_CHANNEL_UP, 0);
+                bt_set_weight(DISPLAY_CHANNEL_DOWN, 0);
                 lock_weight[SCALE_DOWN] = 0;
                 set_zero_count = -1;
                 continue;
@@ -560,6 +560,9 @@ void app_main()
                 }
                 setDisplayNumber(DISPLAY_CHANNEL_UP, downWeight);
                 bt_set_weight(DISPLAY_CHANNEL_UP, downWeight);
+            }else{
+                //make sure gatt not indicate 
+                bt_set_weight(DISPLAY_CHANNEL_UP, -1);
             }
             //set display
             int32_t totalWeight = upWight+downWeight;
