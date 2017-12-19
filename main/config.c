@@ -176,7 +176,9 @@ char* config_get_wifi_name()
 
 bool config_set_wifi_name(char* name, size_t len)
 {
-    free(system_settings.wifi_name);
+    if (system_settings.wifi_name != NULL) {
+        free(system_settings.wifi_name);
+    }
     system_settings.wifi_name = malloc(len+1);
     memset(system_settings.wifi_name, 0, len+1);      //make sure end up with 0
     memcpy(system_settings.wifi_name, name, len);
@@ -192,7 +194,9 @@ char* config_get_wifi_pass()
 
 bool config_set_wifi_pass(char* pass, size_t len)
 {
-    free(system_settings.wifi_pass);
+    if (system_settings.wifi_pass != NULL) {
+        free(system_settings.wifi_pass);
+    }
     system_settings.wifi_pass = malloc(len+1);
     memset(system_settings.wifi_pass, 0, len+1);      //make sure end up with 0
     memcpy(system_settings.wifi_pass, pass, len);
@@ -207,8 +211,12 @@ firmware_t* config_get_firmware_upgrade()
 
 bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, char* path, uint8_t path_len)
 {
-    free(system_settings.firmware.host);
-    free(system_settings.firmware.path);
+    if (system_settings.firmware.host != NULL) {
+        free(system_settings.firmware.host);
+    }
+    if (system_settings.firmware.path != NULL) {
+        free(system_settings.firmware.path);
+    }
     system_settings.firmware.host = malloc(host_len);
     system_settings.firmware.path = malloc(path_len);
     memset(system_settings.firmware.host, 0, host_len+1);      //make sure end up with 0
@@ -229,7 +237,9 @@ char* config_get_device_name()
 
 bool config_set_device_name(char* name, size_t len)
 {
-    free(system_settings.device_name);
+    if (system_settings.device_name != NULL) {
+        free(system_settings.device_name);
+    }
     system_settings.device_name = malloc(len+1);
     memset(system_settings.device_name, 0, len+1);      //make sure end up with 0
     memcpy(system_settings.device_name, name, len);
@@ -240,8 +250,12 @@ bool config_set_device_name(char* name, size_t len)
 
 void config_close()
 {
-    free(system_settings.wifi_name);
-    free(system_settings.wifi_pass);
+    if (system_settings.wifi_name != NULL) {
+        free(system_settings.wifi_name);
+    }
+    if (system_settings.wifi_pass != NULL) {
+        free(system_settings.wifi_pass);
+    }
     nvs_commit(config_handle);
     nvs_close(config_handle);
 }
@@ -283,18 +297,24 @@ void config_reset()
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
 
     //wifi name
-    free(system_settings.wifi_name);
-    system_settings.wifi_name = NULL;
+    if (system_settings.wifi_name != NULL) {
+        free(system_settings.wifi_name);
+        system_settings.wifi_name = NULL;
+    }
     err = nvs_erase_key(config_handle, KEY_WIFI_NAME);
     
     //wifi pass
-    free(system_settings.wifi_pass);
-    system_settings.wifi_pass = NULL;
+    if (system_settings.wifi_pass != NULL) {
+        free(system_settings.wifi_pass);
+        system_settings.wifi_pass = NULL;
+    }
     err = nvs_erase_key(config_handle, KEY_WIFI_PASS);
 
     //device name
-    free(system_settings.device_name);
-    system_settings.device_name = NULL;
+    if (system_settings.device_name != NULL) {
+        free(system_settings.device_name);
+        system_settings.device_name = NULL;
+    }
     err = nvs_erase_key(config_handle, KEY_DEVICE_NAME);
 
     nvs_commit(config_handle);
