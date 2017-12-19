@@ -520,7 +520,7 @@ void app_main()
     int32_t calibration_data[SCALE_NUM][CALIBRATION_NUMS] = {0};
     bool dualScale = false;
     while(!done) {
-        vTaskDelay(100/portTICK_RATE_MS);
+        vTaskDelay(125/portTICK_RATE_MS);
         if (work_status == WORK_STATUS_NORMAL || work_status == WORK_STATUS_WORKING) {
             //ESP_LOGI(TAG, "%d ----- %d", getAdcValue(SCALE_UP), getAdcValue(SCALE_DOWN));
             dualScale = detectDualScale();
