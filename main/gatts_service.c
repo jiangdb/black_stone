@@ -22,6 +22,8 @@
 #include "esp_gatts_api.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "nvs_flash.h"
 #include "bt.h"
 #include "bta_api.h"
@@ -79,9 +81,12 @@ enum {
     CONTROL_START_TIMER,
     CONTROL_PAUSE_TIMER,
     CONTROL_RESET_TIMER,
-    CONTROL_BATTERY_CALIBRATION,
     CONTROL_DEVICE_NAME,
-    CONTROL_FACTORY_RESET,
+
+    //factory commands
+    CONTROL_FACTORY_RESET = 100,
+    CONTROL_BATTERY_CALIBRATION,
+    CONTROL_REBOOT_FACTORY,
 };
 
 enum
@@ -573,11 +578,21 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 send_key_event(keyEvent,false);
             }
             break;
+        case CONTROL_FACTORY_RESET:
+            config_reset();
+            break;
         case CONTROL_BATTERY_CALIBRATION:
             battery_calibration();
             break;
-        case CONTROL_FACTORY_RESET:
-            config_reset();
+        case CONTROL_REBOOT_FACTORY:
+            {
+                esp_partition_iterator_t iter = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+                if (iter != NULL) {
+                    const esp_partition_t *factory_partition = esp_partition_get(iter);
+                    esp_ota_set_boot_partition(factory_partition);
+                    esp_restart();
+                }
+            }
             break;
         default:
             ESP_LOGE(GATTS_SERVICE_TAG, "GATT_WRITE_EVT, write control unknown setting %d", pData[0])
