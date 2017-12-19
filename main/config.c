@@ -217,8 +217,8 @@ bool config_set_firmware_upgrade(char* host, uint8_t host_len, uint8_t port, cha
     if (system_settings.firmware.path != NULL) {
         free(system_settings.firmware.path);
     }
-    system_settings.firmware.host = malloc(host_len);
-    system_settings.firmware.path = malloc(path_len);
+    system_settings.firmware.host = malloc(host_len+1);
+    system_settings.firmware.path = malloc(path_len+1);
     memset(system_settings.firmware.host, 0, host_len+1);      //make sure end up with 0
     memset(system_settings.firmware.path, 0, path_len+1);      //make sure end up with 0
     memcpy(system_settings.firmware.host, host, host_len);
