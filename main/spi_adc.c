@@ -50,7 +50,7 @@
 #define CH_SEL_SHORT          0x3
 
 #define USE_QUEUE_BUFFER      1
-#define BUFFER_SIZE           4
+#define BUFFER_SIZE           6
 #define DEBUG_ISR_INTVAL      0
 
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
