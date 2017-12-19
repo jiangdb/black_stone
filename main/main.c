@@ -26,18 +26,19 @@
 
 #define TAG  "MAIN"
 
-#define GPIO_LED_IO                 19
-#define DISPLAY_LOCK_THRESHOLD      2        //0.2g
-#define DOUBLE_SCALE_THRESHOLD_G    -300     //-30g
-#define DOUBLE_SCALE_THRESHOLD_OZ   -11      //-1.1oz
-#define REPEAT_COUNT_CALIBRATION    7
-#define SLEEP_COUNT                 3
-#define SET_ZERO_COUNT              5       //500ms
-#define FORCE_RESTART_COUNT         20     //10s
-#define SCALE_UP_MAX_WEIGHT_G       10000   //1kg
-#define SCALE_UP_MAX_WEIGHT_OZ      352     //35.2oz
-#define SCALE_DOWN_MAX_WEIGHT_G     20000   //2kg
-#define SCALE_DOWN_MAX_WEIGHT_OZ    704     //70.4oz
+#define GPIO_LED_IO                         19
+#define DISPLAY_LOCK_THRESHOLD_200MG        2       //0.2g
+#define DISPLAY_LOCK_THRESHOLD_500MG        5       //0.5g
+#define DOUBLE_SCALE_THRESHOLD_G            -300    //-30g
+#define DOUBLE_SCALE_THRESHOLD_OZ           -11     //-1.1oz
+#define REPEAT_COUNT_CALIBRATION            7
+#define SLEEP_COUNT                         3
+#define SET_ZERO_COUNT                      5       //500ms
+#define FORCE_RESTART_COUNT                 20      //10s
+#define SCALE_UP_MAX_WEIGHT_G               10000   //1kg
+#define SCALE_UP_MAX_WEIGHT_OZ              352     //35.2oz
+#define SCALE_DOWN_MAX_WEIGHT_G             20000   //2kg
+#define SCALE_DOWN_MAX_WEIGHT_OZ            704     //70.4oz
 
 enum {
     WROK_STATUS_INIT,
@@ -341,8 +342,8 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
     //handle lock
     if (!display_lock[scaleChannel]) {
         //not locked
-        // change more than 0.5g, clear count, else increase
-        if (abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD){
+        // change more than threshhold(weight<0.5g, use 0.5, otherwise 0.2), clear count, else increase
+        if (abs(lock_weight[scaleChannel]-weight) > (weight>5?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
             display_lock_count[scaleChannel] = 0;
             lock_weight[scaleChannel] = weight;
             //reset timeout timer
@@ -359,8 +360,9 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
         rtn = weight;
     }else{
         //locked, check if unlock
-        if ((abs(lock_weight[scaleChannel]-weight) > DISPLAY_LOCK_THRESHOLD)) {
-            lock_display(scaleChannel, false);
+        if (abs(lock_weight[scaleChannel]-weight) > (weight>5?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
+            lock_display(SCALE_UP, false);
+            lock_display(SCALE_DOWN, false);
             lock_weight[scaleChannel] = weight;
             //reset timeout timer
             bs_timer_reset(TIMER_TIMEOUT);
@@ -571,7 +573,7 @@ void app_main()
 
             //check if we need do alarm
             if ((config_get_alarm_enable()==1) && (work_status == WORK_STATUS_WORKING)) {
-                if (totalWeight >= config_get_alarm_weight()) {
+                if (downWeight >= config_get_alarm_weight()) {
                     if (!alarmed ) {
                         alarmNumber();
                         alarmed = true;
@@ -631,6 +633,7 @@ void app_main()
         firmware_t* firmware = config_get_firmware_upgrade();
         if (firmware->host != NULL) {
             if (!ota_task(firmware)){
+                done = false;
                 while(!done) {
                     vTaskDelay(100/portTICK_RATE_MS);
                 }
