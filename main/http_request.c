@@ -29,8 +29,6 @@
 #define IP_HOST                 "api.ipify.org"             //"ip.chinaz.com"
 #define IP_PATH                 "/"                         //"/getip.aspx"
 #define IP_PORT                 80
-#define HOST                    "bm.timemore.com"           //"bs.ziipoo.com.cn"
-#define PORT                    80
 #define API_DEVICE_ONLINE       "/api/v1/device/online"
 #define BUFFSIZE                1024
 #define HTTP_REQUEST_GET		\
@@ -160,7 +158,7 @@ static bool http_get_public_ip(char* ip, int* len)
 static bool http_put_device_online(char* ip) 
 {
     /*connect to http server*/
-    if (!connect_to_http_server(HOST, PORT)) {
+    if (!connect_to_http_server(HOST_PRODUCTION, PORT)) {
         ESP_LOGE(TAG, "error connect to host");
         return false;
     }
@@ -170,7 +168,7 @@ static bool http_put_device_online(char* ip)
     config_get_serial_num(serial_number, 13);
     char http_body[100] =  {0};
     sprintf(http_body, "model_number=%s&serial_number=%s&fw_version=%s&ip_address=%s", MODEL_NUMBER, serial_number, FW_VERSION, ip);
-    sprintf(http_request, HTTP_REQUEST_PUT, API_DEVICE_ONLINE, HOST, strlen(http_body), http_body);
+    sprintf(http_request, HTTP_REQUEST_PUT, API_DEVICE_ONLINE, HOST_PRODUCTION, strlen(http_body), http_body);
     if (!send_request(http_request, strlen(http_request))) {
         ESP_LOGE(TAG, "error send request");
         close(socket_id);

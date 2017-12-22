@@ -27,6 +27,7 @@
 #include "nvs_flash.h"
 #include "bt.h"
 #include "bta_api.h"
+#include "http_request.h"
 #include "gatts_service.h"
 #include "wifi_service.h"
 #include "bs_timer.h"
@@ -82,6 +83,7 @@ enum {
     CONTROL_PAUSE_TIMER,
     CONTROL_RESET_TIMER,
     CONTROL_DEVICE_NAME,
+    CONTROL_FW_UPGRADE_V2,
 
     //factory commands
     CONTROL_FACTORY_RESET = 100,
@@ -545,6 +547,25 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 uint16_t path_offset = port_offset+1;
                 uint8_t path_len = pData[path_offset++];
                 config_set_firmware_upgrade((char*)&pData[2],host_len, port, (char*)&pData[path_offset],path_len);
+                key_event_t keyEvent;
+                keyEvent.key_type = FIRMWARE_UPGRADE_KEY;
+                keyEvent.key_value = KEY_UP;
+                send_key_event(keyEvent,false);
+            }
+            break;
+        case CONTROL_FW_UPGRADE_V2:
+            {
+                uint8_t env = pData[1];
+                uint8_t firmware_id = pData[2];
+                char* host = NULL;
+                if (env == 0) {
+                    host = HOST_PRODUCTION;
+                } else {
+                    host = HOST_STAGING;
+                }
+                char path[50] = {0};
+                sprintf(path, API_OTA_DOWNLOAD, firmware_id);
+                config_set_firmware_upgrade(host,strlen(host), PORT, path, strlen(path));
                 key_event_t keyEvent;
                 keyEvent.key_type = FIRMWARE_UPGRADE_KEY;
                 keyEvent.key_value = KEY_UP;
