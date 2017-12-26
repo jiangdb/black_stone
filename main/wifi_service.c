@@ -30,7 +30,7 @@ static uint8_t wifi_status = WIFI_STATUS_UNSTARTED;
 static TaskHandle_t xHandle = NULL;
 
 void ws_task_loop();
-static void ws_start();
+static void ws_start(char* ssid, char* pass);
 
 esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
 {
@@ -158,8 +158,7 @@ void ws_connect(char* ssid, char* pass)
 
     switch(wifi_status) {
         case WIFI_STATUS_UNSTARTED:
-            ws_start();
-            ws_config(ssid, pass);
+            ws_start(ssid, pass);
             break;
         case WIFI_STATUS_STARTING:
             ws_config(ssid, pass);
@@ -199,7 +198,7 @@ void ws_stop()
     }
 }
 
-static void ws_start()
+static void ws_start(char* ssid, char* pass)
 {
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
@@ -207,6 +206,7 @@ static void ws_start()
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+    ws_config(ssid, pass);
     ESP_ERROR_CHECK( esp_wifi_set_ps(WIFI_PS_MODEM) );
     wifi_status = WIFI_STATUS_STARTING;
     ESP_ERROR_CHECK( esp_wifi_start() );
@@ -218,6 +218,5 @@ void ws_init()
     char* pass = config_get_wifi_pass();
     if (!ws_valid_config(ssid, pass)) return;
 
-    ws_start();
-    ws_config(ssid, pass);
+    ws_start(ssid,pass);
 }
