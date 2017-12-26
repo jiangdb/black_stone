@@ -84,6 +84,9 @@ enum {
     CONTROL_RESET_TIMER,
     CONTROL_DEVICE_NAME,
     CONTROL_FW_UPGRADE_V2,
+    CONTROL_WIFI_NAME,          //cause android not will limit the length of write, we split wifi into ssid/pass/connect
+    CONTROL_WIFI_PASS,
+    CONTROL_WIFI_CONNECT,
 
     //factory commands
     CONTROL_FACTORY_RESET = 100,
@@ -528,6 +531,25 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
                 uint16_t pass_offset = 2+name_len;
                 uint8_t pass_len = pData[pass_offset];
                 config_set_wifi_pass((char*)&pData[pass_offset+1],pass_len);
+                char* wifi_name = config_get_wifi_name();
+                char* wifi_pass = config_get_wifi_pass();
+                ws_connect(wifi_name, wifi_pass);
+            }
+            break;
+        case CONTROL_WIFI_NAME:
+            {
+                uint8_t name_len = pData[1];
+                config_set_wifi_name((char*)&pData[2],name_len);
+            }
+            break;
+        case CONTROL_WIFI_PASS:
+            {
+                uint8_t pass_len = pData[1];
+                config_set_wifi_pass((char*)&pData[2],pass_len);
+            }
+            break;
+        case CONTROL_WIFI_CONNECT:
+            {
                 char* wifi_name = config_get_wifi_name();
                 char* wifi_pass = config_get_wifi_pass();
                 ws_connect(wifi_name, wifi_pass);
