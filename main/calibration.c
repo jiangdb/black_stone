@@ -52,14 +52,14 @@ int32_t get_zero(int channel)
 ** Returns          weight in 0.1g.
 **
 *******************************************************************************/
-int32_t convert_weight(int8_t channel, int32_t adcValue, bool abs)
+int32_t convert_weight(int8_t channel, int32_t adcValue, bool absolute)
 {
 
     if (channel<0||channel>1) return 0;
     if (cal[channel] == 0) return 0;
 
     int32_t weight = 0;
-    if (abs) {
+    if (absolute) {
         weight = ((adcValue - absZero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
     }else{
         weight = ((adcValue - zero[channel]) * CALIBRATION_WEIGHT * 100 )/cal[channel];
