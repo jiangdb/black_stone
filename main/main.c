@@ -342,8 +342,8 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
     //handle lock
     if (!display_lock[scaleChannel]) {
         //not locked
-        // change more than threshhold(weight<0.5g, use 0.5, otherwise 0.2), clear count, else increase
-        if (abs(lock_weight[scaleChannel]-weight) > (weight>5?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
+        // change more than threshhold(lock weight<0.5g, use 0.5, otherwise 0.2), clear count, else increase
+        if (abs(lock_weight[scaleChannel]-weight) > (lock_weight[scaleChannel]>2?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
             display_lock_count[scaleChannel] = 0;
             lock_weight[scaleChannel] = weight;
             //reset timeout timer
@@ -360,7 +360,7 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
         rtn = weight;
     }else{
         //locked, check if unlock
-        if (abs(lock_weight[scaleChannel]-weight) > (weight>5?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
+        if (abs(lock_weight[scaleChannel]-weight) > (lock_weight[scaleChannel]>2?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
             lock_display(SCALE_UP, false);
             lock_display(SCALE_DOWN, false);
             lock_weight[scaleChannel] = weight;
