@@ -67,7 +67,7 @@ int32_t convert_weight(int8_t channel, int32_t adcValue, bool absolute)
 
     if (weight >= 100000 || weight <= -10000) {
         return (weight+50)/10;
-    } else if (abs(weight)<=2){
+    } else if (abs(weight)<=20){
         return 0;
     } else {
         return weight/10;
