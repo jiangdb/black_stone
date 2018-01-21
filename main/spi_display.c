@@ -252,9 +252,6 @@ void setDisplayTime(uint32_t seconds)
             sbAlarm = ALARM_TIME;
         }
     }
-
-    //durating work, we do not let system timeout
-    bs_timer_reset(TIMER_TIMEOUT);
 }
 
 static void setDisplayTimeOff()
