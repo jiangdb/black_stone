@@ -499,23 +499,23 @@ static void display_loop()
             spi_trassfer_display();
             vTaskDelay(50/portTICK_RATE_MS);
             alarmCount++;
-            if (alarmCount > 2) {
+            if (alarmCount > 4) {
                 sbAlarm = ALARM_MAX;
                 alarmCount = 0;
             }
         }else if (sbAlarm == ALARM_NUMBER) {
             switch_beap_vibrate(true);
-            setDisplayNumberOff(DISPLAY_CHANNEL_UP);
+            //setDisplayNumberOff(DISPLAY_CHANNEL_UP);
             setDisplayNumberOff(DISPLAY_CHANNEL_DOWN);
             spi_trassfer_display();
             vTaskDelay(50/portTICK_RATE_MS);
             switch_beap_vibrate(false);
-            setDisplayNumber(DISPLAY_CHANNEL_UP, siWeights[0]);
+            //setDisplayNumber(DISPLAY_CHANNEL_UP, siWeights[0]);
             setDisplayNumber(DISPLAY_CHANNEL_DOWN, siWeights[1]);
             spi_trassfer_display();
             vTaskDelay(50/portTICK_RATE_MS);
             alarmCount++;
-            if (alarmCount > 2) {
+            if (alarmCount > 4) {
                 sbAlarm = ALARM_MAX;
                 alarmCount = 0;
             }
