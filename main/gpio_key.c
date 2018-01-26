@@ -14,6 +14,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "config.h"
 #include "key_event.h"
 #include "key.h"
 
@@ -47,11 +48,21 @@ void switch_beap_vibrate(bool on)
 
 static void beap_vibrate()
 {
-    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);
-    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 1);
+    uint8_t key_sound = config_get_key_sound();
+    uint8_t key_vibrate = config_get_key_vibrate();
+    if (1 == key_sound ) {
+        gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 1);
+    }
+    if (1 == key_vibrate ) {
+        gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 1);
+    }
     vTaskDelay(100/portTICK_RATE_MS);
-    gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
-    gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
+    if (1 == key_sound ) {
+        gpio_set_level(GPIO_OUTPUT_IO_SPEAKER, 0);
+    }
+    if (1 == key_vibrate ) {
+        gpio_set_level(GPIO_OUTPUT_IO_VIBRATE, 0);
+    }
 }
 
 bool is_charging()

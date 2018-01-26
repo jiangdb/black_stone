@@ -24,6 +24,8 @@
 #define TAG "CONFIG"
 
 #define KEY_ZERO_TRACE          "zero trace"
+#define KEY_KEY_SOUND           "key sound"
+#define KEY_KEY_VIBRATE         "key vibrate"
 #define KEY_ALARM_ENABLE        "alarm enable"
 #define KEY_ALARM_TIME          "alarm time"
 #define KEY_ALARM_WEIGHT        "alarm weight"
@@ -35,6 +37,8 @@
 
 typedef struct {
     uint8_t zero_trace;
+    uint8_t key_sound;
+    uint8_t key_vibrate;
     uint8_t alarm_enable;
     uint16_t alarm_time;
     uint16_t alarm_weight;
@@ -71,11 +75,6 @@ bool config_write(char* name, int32_t value)
     return err == ESP_OK;
 }
 
-uint8_t config_get_zero_trace()
-{
-    return system_settings.zero_trace;
-}
-
 // num must be 7 bytes
 void config_get_serial_num(char* serial_num, int len)
 {
@@ -87,6 +86,11 @@ void config_get_serial_num(char* serial_num, int len)
     sprintf(serial_num, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
+uint8_t config_get_zero_trace()
+{
+    return system_settings.zero_trace;
+}
+
 bool config_set_zero_trace(uint8_t enable)
 {
     ESP_LOGD(TAG, "%s: %d\n", __func__, enable);
@@ -96,6 +100,38 @@ bool config_set_zero_trace(uint8_t enable)
         if (err != ESP_OK) return false;
     }
     return true ;
+}
+
+uint8_t config_get_key_sound()
+{
+    return system_settings.key_sound;
+}
+
+bool config_set_key_sound(uint8_t enable)
+{
+    ESP_LOGD(TAG, "%s: %d\n", __func__, enable);
+    if (enable != system_settings.key_sound) {
+        system_settings.key_sound = enable;
+        esp_err_t err = nvs_set_u8(config_handle, KEY_KEY_SOUND, enable);
+        if (err != ESP_OK) return false;
+    }
+    return true ;
+}
+
+uint8_t config_get_key_vibrate()
+{
+    return system_settings.key_vibrate;
+}
+
+bool config_set_key_vibrate(uint8_t enable)
+{
+    ESP_LOGD(TAG, "%s: %d\n", __func__, enable);
+    if (enable != system_settings.key_vibrate) {
+        system_settings.key_vibrate = enable;
+        esp_err_t err = nvs_set_u8(config_handle, KEY_KEY_VIBRATE, enable);
+        if (err != ESP_OK) return false;
+    }
+    return true;
 }
 
 uint8_t config_get_alarm_enable()
@@ -271,6 +307,16 @@ void config_reset()
     err = nvs_erase_key(config_handle, KEY_ZERO_TRACE);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
 
+    //key sound enable
+    system_settings.key_sound = 1;
+    err = nvs_erase_key(config_handle, KEY_KEY_SOUND);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
+    //key vibrate enable
+    system_settings.key_vibrate = 1;
+    err = nvs_erase_key(config_handle, KEY_KEY_VIBRATE);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+
     //alarm enable
     system_settings.alarm_enable = 0;
     err = nvs_erase_key(config_handle, KEY_ALARM_ENABLE);
@@ -338,6 +384,18 @@ void config_load()
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
     ESP_LOGI(TAG, "%s: zero_trace: %d", __func__, system_settings.zero_trace);
 
+    //key sound enable
+    system_settings.key_sound = 1;
+    err = nvs_get_u8(config_handle, KEY_KEY_SOUND, &system_settings.key_sound);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+    ESP_LOGI(TAG, "%s: key_sound: %d", __func__, system_settings.key_sound);
+
+    //key vibrate enable
+    system_settings.key_vibrate = 1;
+    err = nvs_get_u8(config_handle, KEY_KEY_VIBRATE, &system_settings.key_vibrate);
+    assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
+    ESP_LOGI(TAG, "%s: key_sound: %d", __func__, system_settings.key_vibrate);
+ 
     //alarm enable
     err = nvs_get_u8(config_handle, KEY_ALARM_ENABLE, &system_settings.alarm_enable);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);

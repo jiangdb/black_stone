@@ -87,6 +87,8 @@ enum {
     CONTROL_WIFI_NAME,          //cause android not will limit the length of write, we split wifi into ssid/pass/connect
     CONTROL_WIFI_PASS,
     CONTROL_WIFI_CONNECT,
+    CONTROL_KEY_SOUND,
+    CONTROL_KEY_VIBRATE,
 
     //factory commands
     CONTROL_FACTORY_RESET = 100,
@@ -500,6 +502,12 @@ static void handle_weight_control_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb
             break;
         case CONTROL_ZERO_TRACE:
             config_set_zero_trace(pData[1]);
+            break;
+        case CONTROL_KEY_SOUND:
+            config_set_key_sound(pData[1]);
+            break;
+        case CONTROL_KEY_VIBRATE:
+            config_set_key_vibrate(pData[1]);
             break;
         case CONTROL_ALARM:
             config_set_alarm_enable(pData[1]);
