@@ -595,7 +595,7 @@ void app_main()
                 calibrate_step++;
                 memset(calibration_data,0,sizeof(calibration_data));
             }
-            if (calibrate_step < CALIBRATION_STEP_NUM && calibrate_tick >= 20) {
+            if (calibrate_step < CALIBRATION_STEP_NUM && calibrate_tick >= 10) {
                 //set calibration
                 int32_t up = getAdcValue(SCALE_UP);
                 int32_t down = getAdcValue(SCALE_DOWN);
