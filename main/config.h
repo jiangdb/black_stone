@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #define MANUFACTURER            "Timemore"
-#define FW_VERSION              "0.80.19"
+#define FW_VERSION              "0.80.20"
 //#define MODEL_NUMBER            "TES03PL"       //single scale
 #define MODEL_NUMBER            "TES04PL"       //double scale
 
@@ -32,6 +32,12 @@ void config_get_serial_num(char* serial_num, int len);
 
 uint8_t config_get_zero_trace();
 bool config_set_zero_trace(uint8_t enable);
+
+uint8_t config_get_key_sound();
+bool config_set_key_sound(uint8_t enable);
+
+uint8_t config_get_key_vibrate();
+bool config_set_key_vibrate(uint8_t enable);
 
 uint8_t config_get_alarm_enable();
 bool config_set_alarm_enable(uint8_t enable);
