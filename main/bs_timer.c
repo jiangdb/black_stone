@@ -29,6 +29,7 @@
 #define TIMER_SCALE             (TIMER_BASE_CLK / TIMER_DIVIDER)  /*!< used to calculate counter value */
 #define TIMER_INTERVAL_1_SEC    (1)     /*!< 1s */
 #define TIMER_INTERVAL_1_MIN    (60)    /*!< 1m */
+#define TIMER_INTERVAL_3_MIN    (180)   /*!< 3m */
 #define TIMER_INTERVAL_5_MIN    (300)   /*!< 5m */
 
 /*
@@ -113,7 +114,7 @@ static void operation_timer_init()
     /*Load counter value */
     timer_set_counter_value(sTimers[TIMER_TIMEOUT].timer_group, sTimers[TIMER_TIMEOUT].timer_idx, 0x00000000ULL);
     /*Set alarm value*/
-    timer_set_alarm_value(sTimers[TIMER_TIMEOUT].timer_group, sTimers[TIMER_TIMEOUT].timer_idx, TIMER_INTERVAL_5_MIN * TIMER_SCALE);
+    timer_set_alarm_value(sTimers[TIMER_TIMEOUT].timer_group, sTimers[TIMER_TIMEOUT].timer_idx, TIMER_INTERVAL_3_MIN * TIMER_SCALE);
     /*Enable timer interrupt*/
     timer_enable_intr(sTimers[TIMER_TIMEOUT].timer_group, sTimers[TIMER_TIMEOUT].timer_idx);
     /*Set ISR handler*/
