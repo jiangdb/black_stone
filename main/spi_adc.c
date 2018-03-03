@@ -23,6 +23,28 @@
 */
 #define TAG                   "SPI-ADC"
 
+/*
+PRECISION  4
+100g == 3200
+0.031g == 1
+0.062g == 2
+0.093g == 3
+0.124g == 4
+0.155g == 5
+0.186g == 6
+
+PRECISION  5
+100g == 1600
+0.063g == 1
+0.126g == 2
+0.189g == 3
+0.252g == 4
+
+PRECISION  6
+100g == 800
+0.125g == 1
+0.25g  == 2
+*/
 #define PRECISION             4
 
 #define PIN_NUM_DATA          23
@@ -50,7 +72,7 @@
 #define CH_SEL_SHORT          0x3
 
 #define USE_QUEUE_BUFFER      1
-#define BUFFER_SIZE           6
+#define BUFFER_SIZE           12
 #define DEBUG_ISR_INTVAL      0
 
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ

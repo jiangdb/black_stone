@@ -46,7 +46,7 @@
 #define CH_SEL_SHORT          0x3
 
 #define USE_QUEUE_BUFFER          1
-#define BUFFER_SIZE               6
+#define BUFFER_SIZE               12
 
 #define INT_VALID_INTERVAL_10HZ      (240000 * 50)   //50ms for 10HZ
 #define INT_VALID_INTERVAL_40HZ      (240000 * 15)   //15ms for 40HZ
