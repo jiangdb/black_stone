@@ -28,13 +28,15 @@
 
 #define GPIO_LED_IO                         19
 #define DISPLAY_LOCK_THRESHOLD_200MG        2       //0.2g
+#define DISPLAY_LOCK_THRESHOLD_300MG        3       //0.3g
 #define DISPLAY_LOCK_THRESHOLD_500MG        5       //0.5g
 #define DOUBLE_SCALE_THRESHOLD_G            -300    //-30g
 #define DOUBLE_SCALE_THRESHOLD_OZ           -11     //-1.1oz
 #define REPEAT_COUNT_CALIBRATION            7
 #define SLEEP_COUNT                         3
-#define SET_ZERO_COUNT                      5       //500ms
-#define FORCE_RESTART_COUNT                 20      //10s
+#define SET_ZERO_COUNT                      4       //125*4 = 500ms
+#define FORCE_RESTART_COUNT                 20      //500*20 = 10s
+#define DISPLAY_LOCK_COUNT                  24      //125*24 = 3s
 #define SCALE_UP_MAX_WEIGHT_G               10000   //1kg
 #define SCALE_UP_MAX_WEIGHT_OZ              352     //35.2oz
 #define SCALE_DOWN_MAX_WEIGHT_G             20000   //2kg
@@ -64,12 +66,18 @@ enum {
     CALIBRATION_STEP_NUM,
 };
 
+typedef enum {
+    DISPLAY_LOCKED,
+    DISPLAY_UNLOCKING,
+    DISPLAY_UNLOCKED,
+}en_display_lock;
+
 static int calibrate_tick = -1;
 static int calibrate_step = 0;
-static bool display_lock[2] = {true, true};
+static int display_lock[2] = {DISPLAY_LOCKED, DISPLAY_LOCKED};
 static int display_lock_count[2] = {0,0};
-static int set_zero_count = -1;
 static int32_t lock_weight[2] = {0,0};
+static int set_zero_count = -1;
 static bool done = false;
 static bool auto_shutdown = false;
 static int trigger_sleep_count = 0;
@@ -109,10 +117,10 @@ void led_enable(bool enable)
         gpio_set_level(GPIO_LED_IO, 0);
 }
 
-static void lock_display(int channel, bool lock)
+static void lock_display(int channel, en_display_lock lock)
 {
     display_lock[channel] = lock;
-    if (!lock) {
+    if (lock == DISPLAY_UNLOCKED) {
         display_lock_count[channel] = 0;
     }
     ESP_LOGD(TAG,"lock_display[%d]: %d!!!\n", channel, lock);
@@ -340,10 +348,9 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
     if (traced) return 0;       //traced zero
 
     //handle lock
-    if (!display_lock[scaleChannel]) {
+    if (display_lock[scaleChannel] == DISPLAY_UNLOCKED) {
         //not locked
-        // change more than threshhold(lock weight<0.5g, use 0.5, otherwise 0.2), clear count, else increase
-        if (abs(lock_weight[scaleChannel]-weight) > (lock_weight[scaleChannel]>2?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
+        if (abs(lock_weight[scaleChannel]-weight) >= DISPLAY_LOCK_THRESHOLD_200MG){
             display_lock_count[scaleChannel] = 0;
             lock_weight[scaleChannel] = weight;
             //reset timeout timer
@@ -351,19 +358,39 @@ static int32_t parseAdcValue(uint8_t scaleChannel, int32_t adcValue)
         }else{
             display_lock_count[scaleChannel]++;
             //3s not change, lock display
-            if (display_lock_count[scaleChannel] == 30) {
-                lock_display(scaleChannel, true);
+            if (display_lock_count[scaleChannel] == DISPLAY_LOCK_COUNT) {
+                lock_display(scaleChannel, DISPLAY_LOCKED);
                 lock_weight[scaleChannel] = weight;
             }
         }
         //return unlock value
         rtn = weight;
-    }else{
+    } else if(display_lock[scaleChannel] == DISPLAY_UNLOCKING) {
+        static int unlocking_count = 0;
+        unlocking_count++;
+        //reset timeout timer
+        bs_timer_reset(TIMER_TIMEOUT);
+        /*
+        if (unlocking_count == 2 ) {
+            lock_weight[scaleChannel] += (weight-lock_weight[scaleChannel])/2;
+        } else if (unlocking_count == 3) {
+            lock_display(scaleChannel, DISPLAY_UNLOCKED);
+            unlocking_count = 0;
+        }
+        */
+        if (unlocking_count == 2 ) {
+            lock_display(scaleChannel, DISPLAY_UNLOCKED);
+            unlocking_count = 0;
+        }
+        rtn = lock_weight[scaleChannel];
+    } else {
         //locked, check if unlock
-        if (abs(lock_weight[scaleChannel]-weight) > (lock_weight[scaleChannel]>2?DISPLAY_LOCK_THRESHOLD_200MG:DISPLAY_LOCK_THRESHOLD_500MG)){
-            lock_display(SCALE_UP, false);
-            lock_display(SCALE_DOWN, false);
-            lock_weight[scaleChannel] = weight;
+        if (abs(lock_weight[scaleChannel]-weight) >= DISPLAY_LOCK_THRESHOLD_200MG){
+            lock_display(scaleChannel, DISPLAY_UNLOCKING);
+            lock_display(SCALE_DOWN-scaleChannel, DISPLAY_UNLOCKED);
+            //we need unlocking status
+            //lock_weight[scaleChannel] += (weight-lock_weight[scaleChannel])/3;
+            lock_weight[scaleChannel] += (weight-lock_weight[scaleChannel])/2;
             //reset timeout timer
             bs_timer_reset(TIMER_TIMEOUT);
         }
